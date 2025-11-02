@@ -226,3 +226,87 @@ h2 {
         font-size: 1rem;
     }
 }
+
+// Add to existing AttendeeManager.module.scss
+
+.rsvpStatusSection {
+    margin-top: 1.5rem;
+    padding: 1.5rem;
+    border: 2px solid #667eea;
+    border-radius: 12px;
+    background: linear-gradient(135deg, #e8ebfc 0%, #f0f2ff 100%);
+    box-shadow: 0 4px 12px rgba(102, 126, 234, 0.15);
+}
+
+.rsvpText {
+    margin: 0 0 1rem 0;
+    font-weight: 600;
+    color: #495057;
+    font-size: 1rem;
+    text-align: center;
+}
+
+.rsvpProgress {
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+}
+
+.rsvpBar {
+    width: 100%;
+    height: 24px;
+    background-color: #e9ecef;
+    border-radius: 12px;
+    overflow: hidden;
+    box-shadow: inset 0 2px 4px rgba(0, 0, 0, 0.1);
+}
+
+.rsvpFill {
+    height: 100%;
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    transition: width 0.5s ease;
+    border-radius: 12px;
+}
+
+.rsvpCount {
+    text-align: center;
+    font-size: 0.9rem;
+    font-weight: 600;
+    color: #495057;
+}
+
+.highlighted {
+    animation: highlightPulse 2s ease-in-out infinite;
+    border-color: #28a745 !important;
+    background: linear-gradient(135deg, #d4edda 0%, #c3e6cb 100%) !important;
+}
+
+@keyframes highlightPulse {
+    0%, 100% {
+        box-shadow: 0 4px 12px rgba(40, 167, 69, 0.15);
+    }
+    50% {
+        box-shadow: 0 8px 24px rgba(40, 167, 69, 0.35);
+    }
+}
+
+.allRsvpedText {
+    margin: 0 0 1rem 0;
+    font-weight: 700;
+    color: #155724;
+    font-size: 1.1rem;
+}
+
+.waitingText {
+    margin: 0;
+    font-weight: 600;
+    color: #856404;
+    font-size: 1rem;
+}
+
+// Disable inputs after invites sent
+input:disabled {
+    background-color: #f8f9fa;
+    cursor: not-allowed;
+    opacity: 0.7;
+}
