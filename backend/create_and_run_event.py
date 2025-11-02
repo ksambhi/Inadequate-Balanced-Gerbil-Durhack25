@@ -170,7 +170,7 @@ async def create_or_get_opinions(
     
     for question in opinion_questions:
         # Check if opinion already exists
-        query = select(Opinion).where(Opinion.opinion == question)
+        query = select(Opinion).where(Opinion.opinion == question, Opinion.event_id == event_id)
         result = await session.execute(query)
         opinion = result.scalar_one_or_none()
         
@@ -255,6 +255,9 @@ async def create_event_and_attendees() -> int:
             list(all_questions),
             event_id=event.id
         )
+
+        print(f"{event.id} has opinions map: {opinion_map}")
+
         
         # Initialize embedding service
         embedding_service = EmbeddingService()

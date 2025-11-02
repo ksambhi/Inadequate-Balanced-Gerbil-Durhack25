@@ -1,21 +1,20 @@
 """
-Matching Service using cosine similarity on fact embeddings.
+Matching Service using opinion vector dot products.
 
 This service finds the best seat match for an attendee based on their
-facts and a chaos level (0-10). Low chaos = similar matches (high similarity),
-high chaos = opposite matches (low similarity).
+opinion vectors. Higher dot product = more different opinions = better match.
+Each attendee's opinions form a vector, and we maximize the dot product
+between pairs to create the most interesting conversations.
 """
-import os
 import logging
-import random
+import numpy as np
 from typing import List, Dict, Optional
-from dotenv import load_dotenv
 from pydantic import BaseModel, Field
+from sqlalchemy import select
+from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.matcher import EmbeddingService, VectorDB
-
-# Load environment variables
-load_dotenv()
+from app.database import async_session
+from app.models import Opinion, EventAttendee, JoinedOpinion
 
 # Setup logging
 logger = logging.getLogger(__name__)
@@ -37,20 +36,82 @@ class MatchResult(BaseModel):
 
 
 class MatchingAgent:
-    """Service that finds the best seat match for an attendee using cosine similarity."""
+    """Service that finds the best seat match using opinion vector dot products."""
     
     def __init__(self, verbose: bool = False):
         """Initialize the matching service."""
         self.verbose = verbose
-        self.embedding_service = EmbeddingService()
-        self.vector_db = VectorDB()
         
         if self.verbose:
             logging.basicConfig(
                 level=logging.INFO,
                 format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
             )
-            logger.info("✓ Matching service initialized")
+            logger.info("✓ Matching service initialized (opinion-based)")
+    
+    async def _get_opinion_vectors(
+        self,
+        event_id: int,
+        attendee_ids: List[int],
+        session: AsyncSession
+    ) -> Dict[int, np.ndarray]:
+        """
+        Get opinion vectors for all attendees.
+        
+        Args:
+            event_id: ID of the event
+            attendee_ids: List of attendee IDs to get vectors for
+            session: Database session
+            
+        Returns:
+            Dict mapping attendee_id to their opinion vector (numpy array)
+        """
+        # Get all opinions for this event (ordered consistently)
+        opinions_query = (
+            select(Opinion)
+            .where(Opinion.event_id == event_id)
+            .order_by(Opinion.opinion_id)
+        )
+        opinions_result = await session.execute(opinions_query)
+        event_opinions = opinions_result.scalars().all()
+        
+        if not event_opinions:
+            if self.verbose:
+                logger.warning(f"No opinions found for event {event_id}")
+            return {}
+        
+        opinion_ids = [op.opinion_id for op in event_opinions]
+        
+        if self.verbose:
+            logger.info(f"Event has {len(opinion_ids)} opinion questions")
+        
+        # Get all joined opinions for these attendees
+        vectors = {}
+        
+        for attendee_id in attendee_ids:
+            # Get this attendee's opinions
+            joined_query = (
+                select(JoinedOpinion)
+                .where(JoinedOpinion.attendee_id == attendee_id)
+                .where(JoinedOpinion.opinion_id.in_(opinion_ids))
+            )
+            joined_result = await session.execute(joined_query)
+            joined_opinions = joined_result.scalars().all()
+            
+            # Build vector (default to 5 if missing)
+            opinion_dict = {
+                jo.opinion_id: jo.answer
+                for jo in joined_opinions
+            }
+            
+            vector = np.array([
+                opinion_dict.get(op_id, 5)
+                for op_id in opinion_ids
+            ], dtype=float)
+            
+            vectors[attendee_id] = vector
+        
+        return vectors
     
     async def find_match(
         self,
@@ -62,207 +123,159 @@ class MatchingAgent:
         exclude_attendee_ids: Optional[List[int]] = None
     ) -> MatchResult:
         """
-        Find the best seat match for an attendee using cosine similarity.
+        Find the best seat match using opinion vector dot products.
         
         Args:
             attendee_id: ID of the attendee to find a match for
             event_id: ID of the event (only match within same event)
-            facts: List of facts about the attendee
-            opinions: List of opinion dicts with "question" and "answer"
-            chaos_level: Chaos level from 0 (harmony/similar) to 10 (chaos/opposite)
-            exclude_attendee_ids: Optional list of attendee IDs already
-                                  paired to exclude from matching
+            facts: List of facts (not used in this matcher)
+            opinions: List of opinion dicts (not used directly)
+            chaos_level: Chaos level (not used in this matcher)
+            exclude_attendee_ids: List of attendee IDs already paired
         
         Returns:
             MatchResult with the best matched attendee ID
         """
-        # Validate chaos level
-        chaos_level = max(0, min(10, chaos_level))
-        
         # Default to empty list if not provided
         if exclude_attendee_ids is None:
             exclude_attendee_ids = []
         
         if self.verbose:
             logger.info("\n" + "🚀 " + "="*58)
-            logger.info("STARTING MATCHING SERVICE")
+            logger.info("STARTING MATCHING SERVICE (Opinion Vectors)")
             logger.info("="*60)
             logger.info(f"Attendee ID: {attendee_id}")
             logger.info(f"Event ID: {event_id}")
-            logger.info(f"Facts: {len(facts)}")
-            logger.info(f"Opinions: {len(opinions)}")
-            logger.info(f"Chaos Level: {chaos_level}/10")
             logger.info(f"Excluded: {len(exclude_attendee_ids)} attendees")
             logger.info("="*60)
         
-        # Check if we have any facts
-        if not facts:
+        # Get all attendees for this event (going=True)
+        async with async_session() as session:
+            attendees_query = (
+                select(EventAttendee)
+                .where(EventAttendee.event_id == event_id)
+                .where(EventAttendee.going == True)  # noqa: E712
+            )
+            attendees_result = await session.execute(attendees_query)
+            all_attendees = attendees_result.scalars().all()
+            
+            # Get candidate IDs (exclude self and already paired)
+            candidate_ids = [
+                att.id for att in all_attendees
+                if att.id != attendee_id and att.id not in exclude_attendee_ids
+            ]
+            
+            if not candidate_ids:
+                if self.verbose:
+                    logger.warning("⚠️  No candidates available")
+                return MatchResult(
+                    attendee_id=-1,
+                    reasoning="No available candidates to match with",
+                    confidence=0.0
+                )
+            
+            # Get opinion vectors for current attendee and all candidates
+            all_ids = [attendee_id] + candidate_ids
+            vectors = await self._get_opinion_vectors(
+                event_id,
+                all_ids,
+                session
+            )
+            
+            if attendee_id not in vectors:
+                if self.verbose:
+                    logger.warning(f"No opinion vector for attendee {attendee_id}")
+                return MatchResult(
+                    attendee_id=-1,
+                    reasoning="No opinions available for this attendee",
+                    confidence=0.0
+                )
+            
+            current_vector = vectors[attendee_id]
+            
+            # Calculate dot products with all candidates
+            dot_products = {}
+            for candidate_id in candidate_ids:
+                if candidate_id in vectors:
+                    candidate_vector = vectors[candidate_id]
+                    # Dot product: higher = more different
+                    dot_prod = np.dot(current_vector, candidate_vector)
+                    dot_products[candidate_id] = dot_prod
+            
+            if not dot_products:
+                if self.verbose:
+                    logger.warning("No candidates with opinion vectors")
+                return MatchResult(
+                    attendee_id=-1,
+                    reasoning="No candidates with opinions available",
+                    confidence=0.0
+                )
+            
+            # Find the candidate with HIGHEST dot product (most different)
+            best_match_id = max(dot_products.items(), key=lambda x: x[1])[0]
+            best_dot_product = dot_products[best_match_id]
+            
+            # Get attendee name for reasoning
+            attendee_query = select(EventAttendee).where(
+                EventAttendee.id == best_match_id
+            )
+            attendee_result = await session.execute(attendee_query)
+            matched_attendee = attendee_result.scalar_one_or_none()
+            
+            matched_name = (
+                matched_attendee.name if matched_attendee else f"ID {best_match_id}"
+            )
+            
+            # Build reasoning
+            reasoning = (
+                f"Best match with {matched_name} "
+                f"(dot product: {best_dot_product:.2f}). "
+                f"Maximizes opinion diversity for interesting conversations."
+            )
+            
+            # Confidence based on number of candidates
+            confidence = min(1.0, len(dot_products) / 5.0)
+            
             if self.verbose:
-                logger.warning("⚠️  No facts available for matching")
+                logger.info(f"✓ Match found: Attendee {best_match_id}")
+                logger.info(f"  Dot Product: {best_dot_product:.2f}")
+                logger.info(f"  Reasoning: {reasoning}")
+                logger.info(f"  Confidence: {confidence:.2f}")
+                logger.info(f"  Evaluated {len(dot_products)} candidates")
+                logger.info("="*60 + "\n")
+            
             return MatchResult(
-                attendee_id=-1,
-                reasoning="No facts available to match on",
-                confidence=0.0
+                attendee_id=best_match_id,
+                reasoning=reasoning,
+                confidence=confidence
             )
-        
-        # Pick a random fact to search with
-        random_fact = random.choice(facts)
-        
-        if self.verbose:
-            logger.info(f"Selected random fact: '{random_fact}'")
-        
-        # Embed the query fact
-        query_embedding = self.embedding_service.embed_query(random_fact)
-        
-        # Determine search strategy based on chaos level
-        # Low chaos (0-3): Find SIMILAR (high cosine similarity)
-        # Medium chaos (4-6): Random mix
-        # High chaos (7-10): Find OPPOSITE (low cosine similarity)
-        
-        if chaos_level <= 3:
-            # Low chaos: search for similar
-            if self.verbose:
-                logger.info("Strategy: Finding SIMILAR attendees (high similarity)")
-            
-            results = await self.vector_db.search_similar(
-                query_embedding=query_embedding,
-                limit=50,  # Get more candidates
-                event_id=event_id,
-                exclude_attendee_id=attendee_id,
-                exclude_attendee_ids=exclude_attendee_ids
-            )
-            
-            # Higher similarity is better for low chaos
-            sort_ascending = False
-            
-        elif chaos_level <= 6:
-            # Medium chaos: get both similar and opposite, pick randomly
-            if self.verbose:
-                logger.info("Strategy: Finding MIXED attendees (medium chaos)")
-            
-            results = await self.vector_db.search_similar(
-                query_embedding=query_embedding,
-                limit=50,
-                event_id=event_id,
-                exclude_attendee_id=attendee_id,
-                exclude_attendee_ids=exclude_attendee_ids
-            )
-            
-            # Random selection from middle range
-            sort_ascending = None
-            
-        else:
-            # High chaos: search for opposite
-            if self.verbose:
-                logger.info("Strategy: Finding OPPOSITE attendees (low similarity)")
-            
-            results = await self.vector_db.search_opposite(
-                query_embedding=query_embedding,
-                limit=50,
-                event_id=event_id,
-                exclude_attendee_id=attendee_id,
-                exclude_attendee_ids=exclude_attendee_ids
-            )
-            
-            # Lower similarity (higher dissimilarity) is better for high chaos
-            sort_ascending = True
-        
-        if not results:
-            if self.verbose:
-                logger.warning("⚠️  No candidates found")
-            return MatchResult(
-                attendee_id=-1,
-                reasoning="No suitable candidates found in the database",
-                confidence=0.0
-            )
-        
-        if self.verbose:
-            logger.info(f"Found {len(results)} candidates")
-        
-        # Group results by attendee_id and calculate average similarity
-        attendee_scores = {}
-        attendee_facts = {}
-        
-        for row in results:
-            att_id = int(row[0])
-            fact = row[1]
-            similarity = float(row[2])
-            
-            if att_id not in attendee_scores:
-                attendee_scores[att_id] = []
-                attendee_facts[att_id] = []
-            
-            attendee_scores[att_id].append(similarity)
-            attendee_facts[att_id].append(fact)
-        
-        # Calculate average similarity for each attendee
-        attendee_avg = {
-            att_id: sum(scores) / len(scores)
-            for att_id, scores in attendee_scores.items()
-        }
-        
-        if self.verbose:
-            logger.info(f"Unique attendees found: {len(attendee_avg)}")
-        
-        # Select best match based on chaos level
-        if sort_ascending is None:
-            # Medium chaos: pick randomly
-            matched_id = random.choice(list(attendee_avg.keys()))
-            avg_similarity = attendee_avg[matched_id]
-            strategy_desc = "random selection"
-        else:
-            # Sort by average similarity
-            sorted_attendees = sorted(
-                attendee_avg.items(),
-                key=lambda x: x[1],
-                reverse=not sort_ascending
-            )
-            
-            matched_id = sorted_attendees[0][0]
-            avg_similarity = sorted_attendees[0][1]
-            
-            if sort_ascending:
-                strategy_desc = "lowest similarity (most opposite)"
-            else:
-                strategy_desc = "highest similarity (most similar)"
-        
-        # Build reasoning
-        matched_fact = attendee_facts[matched_id][0]
-        
-        if chaos_level <= 3:
-            reasoning = (
-                f"Harmonious match with {strategy_desc}. "
-                f"Similar fact: '{matched_fact}' "
-                f"(similarity: {avg_similarity:.2f})"
-            )
-        elif chaos_level <= 6:
-            reasoning = (
-                f"Balanced match with {strategy_desc}. "
-                f"Related fact: '{matched_fact}' "
-                f"(similarity: {avg_similarity:.2f})"
-            )
-        else:
-            reasoning = (
-                f"Chaotic match with {strategy_desc}. "
-                f"Opposite fact: '{matched_fact}' "
-                f"(dissimilarity: {1 - avg_similarity:.2f})"
-            )
-        
-        # Confidence is based on how many candidates we had
-        confidence = min(1.0, len(attendee_avg) / 10.0)
-        
-        if self.verbose:
-            logger.info(f"✓ Match found: Attendee {matched_id}")
-            logger.info(f"  Reasoning: {reasoning}")
-            logger.info(f"  Confidence: {confidence:.2f}")
-            logger.info(f"  Avg Similarity: {avg_similarity:.2f}")
-            logger.info("="*60 + "\n")
-        
-        return MatchResult(
-            attendee_id=matched_id,
-            reasoning=reasoning,
-            confidence=confidence
-        )
+
+
+# Example usage
+async def main():
+    """Example usage of the matching service."""
+    agent = MatchingAgent(verbose=True)
+    
+    # Example attendee data
+    result = await agent.find_match(
+        attendee_id=1,
+        event_id=1,
+        facts=["Loves dogs", "Enjoys hiking", "Works in tech"],
+        opinions=[
+            {"question": "Favorite food?", "answer": 8},
+            {"question": "Morning person?", "answer": 9}
+        ],
+        chaos_level=5.0
+    )
+    
+    print(f"Best match: Attendee {result.attendee_id}")
+    print(f"Reasoning: {result.reasoning}")
+    print(f"Confidence: {result.confidence}")
+
+
+if __name__ == "__main__":
+    import asyncio
+    asyncio.run(main())
 
 
 # Example usage
