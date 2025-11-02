@@ -206,12 +206,26 @@ async def count_rsvp(
     if not event:
         raise HTTPException(status_code=404, detail="Event not found")
     
+    # Count total attendees
+    total_result = await db.execute(
+        select(func.count(EventAttendee.id))
+        .where(EventAttendee.event_id == event_id)
+    )
+    total_count = total_result.scalar()
+    
     # Count attendees with rsvp = True
-    result = await db.execute(
+    rsvp_result = await db.execute(
         select(func.count(EventAttendee.id))
         .where(EventAttendee.event_id == event_id)
         .where(EventAttendee.rsvp == True)
     )
-    count = result.scalar()
+    rsvp_count = rsvp_result.scalar()
     
-    return {"event_id": event_id, "rsvp_count": count}
+    # Calculate pending (not RSVPed)
+    pending_count = total_count - rsvp_count
+    
+    return {
+        "event_id": event_id,
+        "rsvp_count": rsvp_count,
+        "pending_count": pending_count
+    }
