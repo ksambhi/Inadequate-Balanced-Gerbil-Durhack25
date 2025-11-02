@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import type { Attendee, RawAttendee } from '../../types/data.types'; 
 import styles from './AttendeeManager.module.scss';
 import { MOCK_ATTENDEES } from '../../hooks/useSeatingAlgorithm'; 
@@ -9,13 +9,15 @@ interface Props {
 }
 
 export const AttendeeManager: React.FC<Props> = ({ onSetAttendees, onGeneratePlan }) => {
-  // New state to manage an array of raw attendee objects (Name & Phone)
   const [rawAttendees, setRawAttendees] = useState<RawAttendee[]>([
     { id: '1', name: '', phoneNumber: '' }
   ]);
   const [attendeesWithViews, setAttendeesWithViews] = useState<Attendee[]>([]);
   const [invitesSent, setInvitesSent] = useState(false);
   const [rsvpStatus, setRsvpStatus] = useState<Record<string, boolean>>({});
+  
+  const pollingIntervalRef = useRef<number | null>(null);
+  const timeoutRef = useRef<number | null>(null);
 
   // --- HANDLERS FOR DYNAMIC INPUTS ---
 
@@ -35,9 +37,81 @@ export const AttendeeManager: React.FC<Props> = ({ onSetAttendees, onGeneratePla
     setRawAttendees(newAttendees);
   };
 
+  // Poll the backend to check RSVP status
+  const pollRsvpStatus = async (attendeeIds: string[]) => {
+    try {
+      // Replace with your actual API endpoint
+      const response = await fetch('/api/rsvp-status', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ attendeeIds }),
+      });
+
+      if (!response.ok) {
+        throw new Error('Failed to fetch RSVP status');
+      }
+
+      const data = await response.json();
+      // Expecting response like: { rsvpStatus: { "id1": true, "id2": false, ... } }
+      setRsvpStatus(data.rsvpStatus);
+
+      // Check if all have RSVP'd
+      const allRsvped = attendeeIds.every(id => data.rsvpStatus[id]);
+      if (allRsvped) {
+        stopPolling();
+      }
+    } catch (error) {
+      console.error('Error polling RSVP status:', error);
+    }
+  };
+
+  const stopPolling = () => {
+    if (pollingIntervalRef.current) {
+      clearInterval(pollingIntervalRef.current);
+      pollingIntervalRef.current = null;
+    }
+    if (timeoutRef.current) {
+      clearTimeout(timeoutRef.current);
+      timeoutRef.current = null;
+    }
+  };
+
+  const markAllAsRsvped = (attendeeIds: string[]) => {
+    const allRsvped: Record<string, boolean> = {};
+    attendeeIds.forEach(id => {
+      allRsvped[id] = true;
+    });
+    setRsvpStatus(allRsvped);
+    stopPolling();
+  };
+
+  // Start polling when invites are sent
+  const startPolling = (attendeeIds: string[]) => {
+    // Poll every 2 seconds
+    pollingIntervalRef.current = window.setInterval(() => {
+      pollRsvpStatus(attendeeIds);
+    }, 2000);
+
+    // Timeout after 30 seconds - mark everyone as RSVP'd
+    timeoutRef.current = window.setTimeout(() => {
+      console.log('30 second timeout reached, marking all as RSVP\'d');
+      markAllAsRsvped(attendeeIds);
+    }, 10000);
+  };
+
+  // Cleanup on unmount
+  useEffect(() => {
+    return () => {
+      stopPolling();
+    };
+  }, []);
+
   // --- MOCK INVITATION LOGIC ---
 
-  const handleSendInvites = () => {
+  const handleSendInvites = async () => {
+    console.log('Sending invites to:', rawAttendees);
     const validAttendees = rawAttendees.filter(a => a.name.trim() !== '');
 
     if (validAttendees.length === 0) return;
@@ -55,15 +129,20 @@ export const AttendeeManager: React.FC<Props> = ({ onSetAttendees, onGeneratePla
       name: raw.name,
       phone: raw.phoneNumber,
       email: `attendee${index + 1}@example.com`,
-      // Assign mock view data to the corresponding input attendee
       opinions: MOCK_ATTENDEES[index % MOCK_ATTENDEES.length].opinions
     }));
 
+    console.log("Right before sending to backend");
+
     setAttendeesWithViews(finalData);
     setInvitesSent(true);
-    
+
     // Call the parent's onSetAttendees to handle the PUT request
-    onSetAttendees(finalData);
+    await onSetAttendees(finalData);
+
+    // Start polling for RSVP status
+    const attendeeIds = validAttendees.map(a => a.id);
+    startPolling(attendeeIds);
   };
 
   const totalInvited = rawAttendees.filter(a => a.name.trim() !== '').length;
@@ -120,7 +199,7 @@ export const AttendeeManager: React.FC<Props> = ({ onSetAttendees, onGeneratePla
           className={styles.inviteButton} 
           disabled={totalInvited === 0}
         >
-          Send Invites (MOCK: Load Data for {totalInvited} People)
+          Send Invites to {totalInvited} {totalInvited === 1 ? 'Person' : 'People'}
         </button>
       ) : (
         <div className={styles.rsvpStatusSection}>
