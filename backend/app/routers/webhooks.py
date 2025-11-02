@@ -1,11 +1,11 @@
 from fastapi import APIRouter, Request, HTTPException
-from typing import Any, Dict, List
+from typing import Any, Dict
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 from app.database import async_session
 from app.gemini_service import GeminiProcessor
 from app.matcher import EmbeddingService, VectorDB
-from app.models import Opinion, JoinedOpinion, EventAttendee
+from app.models import EventAttendee
 
 router = APIRouter(prefix="/webhook", tags=["webhooks"])
 
@@ -59,7 +59,7 @@ async def elevenlabs_webhook(request: Request) -> Dict[str, Any]:
         gemini_processor = GeminiProcessor()
         extraction = await gemini_processor.process_conversation(transcript)
         
-        print(f"Extracted {len(extraction.facts)} facts and {len(extraction.opinions)} opinions")
+        print(f"Extracted {len(extraction.facts)} facts")
         
         # Initialize services
         embedding_service = EmbeddingService()
@@ -80,15 +80,25 @@ async def elevenlabs_webhook(request: Request) -> Dict[str, Any]:
             await vector_db.insert_facts_batch(fact_records)
             print(f"Stored {len(fact_records)} facts for attendee {attendee_id}")
         
-        # Store opinions
-        if extraction.opinions:
-            await store_opinions(attendee_id, extraction.opinions)
-            print(f"Stored {len(extraction.opinions)} opinions for attendee {attendee_id}")
+        # Store opinions using the new method (if event_id is provided)
+        opinions_count = 0
+        if event_id:
+            async with async_session() as session:
+                joined_opinions = await gemini_processor.get_opinions(
+                    event_id=event_id,
+                    attendee_id=attendee_id,
+                    transcript=transcript,
+                    db=session
+                )
+                opinions_count = len(joined_opinions)
+                print(f"Stored {opinions_count} event-specific opinions for attendee {attendee_id}")
+        else:
+            print("No event_id provided, skipping opinion extraction")
         
         return {
             "status": "ok",
             "facts_count": len(extraction.facts),
-            "opinions_count": len(extraction.opinions)
+            "opinions_count": opinions_count
         }
         
     except Exception as e:
@@ -97,52 +107,3 @@ async def elevenlabs_webhook(request: Request) -> Dict[str, Any]:
         import traceback
         traceback.print_exc()
         return {"status": "error", "message": str(e)}
-
-
-async def store_opinions(attendee_id: int, opinions: List[Any]) -> None:
-    """
-    Store opinions in Opinion and JoinedOpinion tables.
-    
-    Args:
-        attendee_id: ID of the attendee
-        opinions: List of ExtractedOpinion objects
-    """
-    async with async_session() as session:
-        for opinion_data in opinions:
-            question = opinion_data.question
-            answer = opinion_data.answer
-            
-            # Check if opinion question already exists
-            result = await session.execute(
-                select(Opinion).where(Opinion.opinion == question)
-            )
-            opinion = result.scalar_one_or_none()
-            
-            # Create opinion if it doesn't exist
-            if not opinion:
-                opinion = Opinion(opinion=question)
-                session.add(opinion)
-                await session.flush()  # Flush to get the opinion_id
-            
-            # Check if this attendee already answered this opinion
-            result = await session.execute(
-                select(JoinedOpinion).where(
-                    JoinedOpinion.attendee_id == attendee_id,
-                    JoinedOpinion.opinion_id == opinion.opinion_id
-                )
-            )
-            existing_joined = result.scalar_one_or_none()
-            
-            if existing_joined:
-                # Update existing answer
-                existing_joined.answer = answer
-            else:
-                # Create new joined opinion
-                joined_opinion = JoinedOpinion(
-                    attendee_id=attendee_id,
-                    opinion_id=opinion.opinion_id,
-                    answer=answer
-                )
-                session.add(joined_opinion)
-        
-        await session.commit()

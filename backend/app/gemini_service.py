@@ -4,6 +4,9 @@ from pydantic import BaseModel, Field
 import google.generativeai as genai
 import os
 import json
+from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy import select
+from app.models import Opinion, EventAttendee, JoinedOpinion
 
 
 class ExtractedFact(BaseModel):
@@ -137,7 +140,7 @@ Extract the facts and opinions as JSON:"""
             return ConversationExtraction(facts=[], opinions=[])
     
     async def process_conversation(
-        self, 
+        self,
         transcript: List[Dict[str, str]]
     ) -> ConversationExtraction:
         """
@@ -160,3 +163,83 @@ Extract the facts and opinions as JSON:"""
         extraction = self.extract_structured_data(cleaned_text)
         
         return extraction
+    
+    async def get_opinions(
+        self,
+        event_id: int,
+        attendee_id: int,
+        transcript: List[Dict[str, str]],
+        db: AsyncSession
+    ) -> List[JoinedOpinion]:
+        """
+        Get opinions for an event and extract user's answers from transcript.
+        
+        This method:
+        1. Fetches all opinion questions associated with the event
+        2. For each opinion, asks the AI to extract the user's answer
+        3. Stores answers in the JoinedOpinion table
+        
+        Args:
+            event_id: ID of the event
+            attendee_id: ID of the attendee
+            transcript: Conversation transcript
+            db: Database session
+            
+        Returns:
+            List of created JoinedOpinion records
+        """
+        # Get all opinions for this event
+        query = select(Opinion).where(Opinion.event_id == event_id)
+        result = await db.execute(query)
+        opinions = result.scalars().all()
+        
+        if not opinions:
+            print(f"No opinions found for event {event_id}")
+            return []
+        
+        # Clean the transcript
+        cleaned_text = self.clean_transcript(transcript)
+        
+        if not cleaned_text:
+            print("No valid conversation content found in transcript")
+            return []
+        
+        # Process each opinion question
+        joined_opinions = []
+        for opinion in opinions:
+            prompt = f"""You are analyzing a conversation transcript.
+Extract the user's answer to the following question.
+Return ONLY the answer as one short sentence (maximum 15 words).
+If the user did not answer this question or the topic wasn't discussed, return "No answer provided".
+
+Question: {opinion.opinion}
+
+Conversation transcript:
+{cleaned_text}
+
+User's answer (one short sentence):"""
+
+            try:
+                response = self.model.generate_content(prompt)
+                answer = response.text.strip()
+                
+                # Create JoinedOpinion record
+                joined_opinion = JoinedOpinion(
+                    attendee_id=attendee_id,
+                    opinion_id=opinion.opinion_id,
+                    answer=answer
+                )
+                db.add(joined_opinion)
+                joined_opinions.append(joined_opinion)
+                
+            except Exception as e:
+                print(f"Error extracting opinion for '{opinion.opinion}': {e}")
+                continue
+        
+        # Commit all joined opinions
+        if joined_opinions:
+            await db.commit()
+            for jo in joined_opinions:
+                await db.refresh(jo)
+        
+        return joined_opinions
