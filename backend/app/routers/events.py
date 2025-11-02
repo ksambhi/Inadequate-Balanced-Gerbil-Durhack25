@@ -5,7 +5,9 @@ from sqlalchemy import select, func
 from sqlalchemy.orm import selectinload
 
 from app.database import get_db
-from app.models import Event, EventAttendee, JoinedOpinion, Opinion
+from app.models import Event, EventAttendee, JoinedOpinion, Opinion, Fact
+from app.matching_agent import MatchingAgent, MatchResult
+from app.matcher_runner import MatcherRunner
 
 router = APIRouter(prefix="/api/events", tags=["events"])
 
@@ -229,3 +231,112 @@ async def count_rsvp(
         "rsvp_count": rsvp_count,
         "pending_count": pending_count
     }
+
+
+@router.post("/{event_id}/find_match/{attendee_id}", response_model=dict)
+async def find_seat_match(
+    event_id: int,
+    attendee_id: int,
+    db: AsyncSession = Depends(get_db)
+):
+    """
+    Use AI agent to find the best seat match for an attendee.
+    Uses the event's chaos_temp as the chaos level.
+    """
+    # Check if event exists
+    event_result = await db.execute(
+        select(Event).where(Event.id == event_id)
+    )
+    event = event_result.scalar_one_or_none()
+    
+    if not event:
+        raise HTTPException(status_code=404, detail="Event not found")
+    
+    # Check if attendee exists and belongs to this event
+    attendee_result = await db.execute(
+        select(EventAttendee)
+        .where(EventAttendee.id == attendee_id)
+        .where(EventAttendee.event_id == event_id)
+        .options(selectinload(EventAttendee.facts))
+        .options(selectinload(EventAttendee.opinions))
+    )
+    attendee = attendee_result.scalar_one_or_none()
+    
+    if not attendee:
+        raise HTTPException(
+            status_code=404,
+            detail="Attendee not found or doesn't belong to this event"
+        )
+    
+    # Gather facts
+    facts = [fact.fact for fact in attendee.facts]
+    
+    # Gather opinions with questions
+    opinions = []
+    for joined_opinion in attendee.opinions:
+        opinion_result = await db.execute(
+            select(Opinion).where(
+                Opinion.opinion_id == joined_opinion.opinion_id
+            )
+        )
+        opinion = opinion_result.scalar_one_or_none()
+        if opinion:
+            opinions.append({
+                "question": opinion.opinion,
+                "answer": joined_opinion.answer
+            })
+    
+    # Initialize the matching agent
+    agent = MatchingAgent()
+    
+    # Find the best match using the event's chaos_temp
+    match_result = await agent.find_match(
+        attendee_id=attendee_id,
+        facts=facts,
+        opinions=opinions,
+        chaos_level=event.chaos_temp
+    )
+    
+    # Return the result
+    return {
+        "attendee_id": attendee_id,
+        "matched_with": match_result.attendee_id,
+        "reasoning": match_result.reasoning,
+        "confidence": match_result.confidence,
+        "chaos_level": event.chaos_temp
+    }
+
+
+@router.post("/{event_id}/allocate_seats", response_model=dict)
+async def allocate_seats(
+    event_id: int,
+    verbose: bool = False,
+    db: AsyncSession = Depends(get_db)
+):
+    """
+    Run the matcher runner to allocate seats for all attendees.
+    
+    This endpoint:
+    1. Fetches all attendees for the event
+    2. Matches them into pairs using the AI agent
+    3. Allocates seats sequentially (table 0 seat 0, 0 seat 1, etc.)
+    4. Updates the database with seat assignments
+    
+    Args:
+        event_id: ID of the event
+        verbose: Enable verbose logging (default: False)
+        db: Database session
+        
+    Returns:
+        Dict with allocation results
+    """
+    runner = MatcherRunner(verbose=verbose)
+    result = await runner.run(event_id=event_id)
+    
+    if not result.get("success"):
+        raise HTTPException(
+            status_code=400,
+            detail=result.get("error", "Unknown error occurred")
+        )
+    
+    return result
