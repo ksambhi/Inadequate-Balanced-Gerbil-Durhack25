@@ -27,7 +27,7 @@ logger = logging.getLogger(__name__)
 
 EVENT_CONFIG = {
     "name": "AI Meetup 2025",
-    "chaos_temp": 10,  # 0-10 (0=harmony, 10=chaos)
+    "chaos_temp": 5,  # 0-10 (0=harmony, 10=chaos)
     "num_tables": 3,    # Will be calculated from attendees if None
 }
 
