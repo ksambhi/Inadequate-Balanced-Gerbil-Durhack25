@@ -8,6 +8,9 @@ dependencies = [
     "alembic>=1.17.1",
     "asyncpg>=0.30.0",
     "fastapi[standard]>=0.120.4",
+    "pgvector>=0.3.6",
+    "psycopg2-binary>=2.9.10",
     "python-dotenv>=1.2.1",
     "sqlalchemy>=2.0.44",
+    "google-generativeai>=0.8.3",
 ]
