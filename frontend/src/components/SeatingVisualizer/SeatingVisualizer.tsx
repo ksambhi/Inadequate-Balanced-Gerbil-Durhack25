@@ -113,12 +113,12 @@ const getDynamicBackgroundColor = (viewValue: number, selectedView: string, sett
 const getCurrentViewValue = (attendee: Attendee, selectedView: string, settings: EventSettings): number => {
     const viewIndex = settings.views.indexOf(selectedView);
     
-    if (viewIndex === -1 || !attendee.views.views[viewIndex]) {
+    if (viewIndex === -1 || !attendee.opinions.views[viewIndex]) {
         // Fallback to neutral if view not found or index is out of bounds
         return 0.5; 
     }
     
-    return attendee.views.views[viewIndex]; 
+    return attendee.opinions.views[viewIndex]; 
 };
 
 

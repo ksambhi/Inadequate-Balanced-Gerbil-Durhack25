@@ -46,8 +46,10 @@ export const AttendeeManager: React.FC<Props> = ({ onGeneratePlan }) => {
     const finalData: Attendee[] = validAttendees.map((raw, index) => ({
       id: raw.id,
       name: raw.name,
+      phone: raw.phoneNumber,
+      email: `attendee${index + 1}@example.com`,
       // Assign mock view data to the corresponding input attendee
-      views: MOCK_ATTENDEES[index % MOCK_ATTENDEES.length].views 
+      opinions: MOCK_ATTENDEES[index % MOCK_ATTENDEES.length].opinions
     }));
 
     setAttendeesWithViews(finalData);

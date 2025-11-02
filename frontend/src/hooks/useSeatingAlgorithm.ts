@@ -9,12 +9,12 @@ export const MOCK_ATTENDEES: Attendee[] = [
     { 
         id: 'a1', 
         name: 'Alice C.', 
-        views: { views: [1, 0.2] }
+        opinions: { views: [1, 0.2] }
     },
     { 
         id: 'a2', 
         name: 'Bob L.', 
-        views: { views: [0, 0.8] }
+        opinions: { views: [0, 0.8] }
     },
     // ... continue for all mock attendees
 ];
