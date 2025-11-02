@@ -78,11 +78,8 @@ function App() {
     try {
       // Make request to backend to allocate seats
       const response = await axios.post(
-        `${BASE_URL}/events/${eventId}/allocate_seats`,
+        `${BASE_URL}/events/${eventId}/start_matching`,
         null, // No body needed
-        {
-          params: { verbose: false }
-        }
       );
 
       console.log("Seating allocation successful:", response.data);
