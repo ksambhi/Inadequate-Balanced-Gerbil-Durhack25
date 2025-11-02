@@ -42,9 +42,9 @@ ATTENDEES_DATA = [
             "Enjoys cooking Italian food"
         ],
         "opinions": {
-            "What's your favorite programming language?": "Python",
-            "Coffee or tea?": "Coffee, definitely!",
-            "Morning person or night owl?": "Morning person"
+            "What's your favorite programming language?": 9,
+            "Coffee or tea?": 10,
+            "Morning person or night owl?": 9
         }
     },
     {
@@ -57,9 +57,9 @@ ATTENDEES_DATA = [
             "Loves pizza and craft beer"
         ],
         "opinions": {
-            "What's your favorite programming language?": "Python and Go",
-            "Coffee or tea?": "Coffee all day",
-            "Morning person or night owl?": "Early bird gets the worm"
+            "What's your favorite programming language?": 9,
+            "Coffee or tea?": 10,
+            "Morning person or night owl?": 10
         }
     },
     {
@@ -72,9 +72,9 @@ ATTENDEES_DATA = [
             "Vegetarian and loves Thai food"
         ],
         "opinions": {
-            "What's your favorite programming language?": "Julia for ML",
-            "Coffee or tea?": "Green tea enthusiast",
-            "Morning person or night owl?": "Night owl, most creative at night"
+            "What's your favorite programming language?": 8,
+            "Coffee or tea?": 2,
+            "Morning person or night owl?": 2
         }
     },
     {
@@ -87,13 +87,9 @@ ATTENDEES_DATA = [
             "Enjoys hiking and wildlife observation"
         ],
         "opinions": {
-            "What's your favorite programming language?": (
-                "JavaScript/TypeScript"
-            ),
-            "Coffee or tea?": "Tea, especially chamomile",
-            "Morning person or night owl?": (
-                "Night person, work best after 9 PM"
-            )
+            "What's your favorite programming language?": 8,
+            "Coffee or tea?": 3,
+            "Morning person or night owl?": 1
         }
     },
     {
@@ -106,9 +102,9 @@ ATTENDEES_DATA = [
             "Enjoys Mexican and Indian cuisine"
         ],
         "opinions": {
-            "What's your favorite programming language?": "R and Python",
-            "Coffee or tea?": "Coffee, but not too strong",
-            "Morning person or night owl?": "Flexible, depends on the day"
+            "What's your favorite programming language?": 9,
+            "Coffee or tea?": 7,
+            "Morning person or night owl?": 5
         }
     },
     {
@@ -121,9 +117,9 @@ ATTENDEES_DATA = [
             "Loves sushi and Japanese food"
         ],
         "opinions": {
-            "What's your favorite programming language?": "Go and Rust",
-            "Coffee or tea?": "Water, stay hydrated!",
-            "Morning person or night owl?": "Morning runner, up at 5 AM"
+            "What's your favorite programming language?": 8,
+            "Coffee or tea?": 0,
+            "Morning person or night owl?": 10
         }
     },
     {
@@ -136,9 +132,9 @@ ATTENDEES_DATA = [
             "Loves Mediterranean food"
         ],
         "opinions": {
-            "What's your favorite programming language?": "Python for backend",
-            "Coffee or tea?": "Herbal tea in the evening",
-            "Morning person or night owl?": "Night owl, creative at midnight"
+            "What's your favorite programming language?": 9,
+            "Coffee or tea?": 4,
+            "Morning person or night owl?": 1
         }
     },
     {
@@ -151,9 +147,9 @@ ATTENDEES_DATA = [
             "Enjoys BBQ and grilling"
         ],
         "opinions": {
-            "What's your favorite programming language?": "Swift",
-            "Coffee or tea?": "Cold brew coffee",
-            "Morning person or night owl?": "Morning person, climb at dawn"
+            "What's your favorite programming language?": 7,
+            "Coffee or tea?": 9,
+            "Morning person or night owl?": 10
         }
     },
 ]
@@ -161,7 +157,8 @@ ATTENDEES_DATA = [
 
 async def create_or_get_opinions(
     session,
-    opinion_questions: List[str]
+    opinion_questions: List[str],
+    event_id
 ) -> Dict[str, int]:
     """
     Create or retrieve opinion questions from the database.
@@ -179,7 +176,7 @@ async def create_or_get_opinions(
         
         if not opinion:
             # Create new opinion
-            opinion = Opinion(opinion=question)
+            opinion = Opinion(opinion=question, event_id=event_id)
             session.add(opinion)
             await session.flush()
             logger.info(f"Created opinion: {question}")
@@ -255,7 +252,8 @@ async def create_event_and_attendees() -> int:
         # Create or get opinions
         opinion_map = await create_or_get_opinions(
             session,
-            list(all_questions)
+            list(all_questions),
+            event_id=event.id
         )
         
         # Initialize embedding service
