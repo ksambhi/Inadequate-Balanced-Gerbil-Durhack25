@@ -60,6 +60,8 @@ export const AttendeeManager: React.FC<Props> = ({ onSetAttendees, onGeneratePla
     }));
 
     setAttendeesWithViews(finalData);
+    setInvitesSent(true);
+    
     // Call the parent's onSetAttendees to handle the PUT request
     onSetAttendees(finalData);
   };
