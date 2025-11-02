@@ -61,7 +61,7 @@ class GeminiProcessor:
             message = msg.get("message", "")
             
             # Skip empty messages
-            if not message.strip():
+            if not message or not message.strip():
                 continue
             
             # Skip workflow messages

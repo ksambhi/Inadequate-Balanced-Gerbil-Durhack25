@@ -7,10 +7,10 @@ from app.gemini_service import GeminiProcessor
 from app.matcher import EmbeddingService, VectorDB
 from app.models import EventAttendee
 
-router = APIRouter(prefix="/webhook", tags=["webhooks"])
+router = APIRouter(prefix="", tags=["webhooks"])
 
 
-@router.post("/")
+@router.post("/webhook")
 async def elevenlabs_webhook(request: Request) -> Dict[str, Any]:
     """Handle ElevenLabs post-call webhook.
     
