@@ -290,6 +290,14 @@ async def count_rsvp(
 @router.post("/{event_id}/call_attendees")
 async def call_attendees(event_id: int, db: AsyncSession = Depends(get_db)):
     """Trigger outbound calls for all attendees of an event using ElevenLabs API."""
+    import random
+    
+    # Get all opinions for this event
+    opinions_result = await db.execute(
+        select(Opinion).where(Opinion.event_id == event_id)
+    )
+    event_opinions = opinions_result.scalars().all()
+    
     result = await db.execute(
         select(EventAttendee).where(EventAttendee.event_id == event_id)
     )
@@ -297,7 +305,24 @@ async def call_attendees(event_id: int, db: AsyncSession = Depends(get_db)):
     call_results = []
     for attendee in attendees:
         if not attendee.phone:
-            continue  # Skip if no phone number
+            # Skip if no phone number - populate with random opinions
+            for opinion in event_opinions:
+                # Check if opinion already exists for this attendee
+                existing = await db.execute(
+                    select(JoinedOpinion).where(
+                        JoinedOpinion.attendee_id == attendee.id,
+                        JoinedOpinion.opinion_id == opinion.opinion_id
+                    )
+                )
+                if not existing.scalar_one_or_none():
+                    joined_opinion = JoinedOpinion(
+                        attendee_id=attendee.id,
+                        opinion_id=opinion.opinion_id,
+                        answer=random.randint(0, 10)
+                    )
+                    db.add(joined_opinion)
+            await db.commit()
+            continue
         call_response = make_elevenlabs_call(attendee.phone, user=attendee.name, event_id=event_id, user_id=attendee.id)
         call_results.append({"id": attendee.id, "phone": attendee.phone, "result": call_response})
     return {"calls": call_results}

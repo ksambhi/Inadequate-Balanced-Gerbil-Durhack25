@@ -1,4 +1,5 @@
 """Gemini AI service for processing conversation transcripts."""
+import random
 from typing import List, Dict, Any, Optional
 from pydantic import BaseModel, Field
 import google.generativeai as genai
@@ -209,19 +210,29 @@ Extract the facts and opinions as JSON:"""
         for opinion in opinions:
             prompt = f"""You are analyzing a conversation transcript.
 Extract the user's answer to the following question.
-Return ONLY the answer as one short sentence (maximum 15 words).
-If the user did not answer this question or the topic wasn't discussed, return "No answer provided".
+Return ONLY a non-negative integer (0 to 10) representing their answer.
+If the user did not answer this question or the topic wasn't discussed, pick a random number.
 
 Question: {opinion.opinion}
 
 Conversation transcript:
 {cleaned_text}
 
-User's answer (one short sentence):"""
+User's answer (integer only):"""
 
             try:
                 response = self.model.generate_content(prompt)
-                answer = response.text.strip()
+                answer_text = response.text.strip()
+                
+                # Parse integer from response
+                try:
+                    answer = int(answer_text)
+                    # Ensure non-negative
+                    if answer < 0:
+                        answer = 0
+                except ValueError:
+                    print(f"Could not parse integer from '{answer_text}', using a random number")
+                    answer = random.randint(0, 10)
                 
                 # Create JoinedOpinion record
                 joined_opinion = JoinedOpinion(
