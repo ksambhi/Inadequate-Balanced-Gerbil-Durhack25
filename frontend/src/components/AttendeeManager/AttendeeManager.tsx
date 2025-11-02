@@ -117,8 +117,8 @@ export const AttendeeManager: React.FC<Props> = ({ onSetAttendees, onGeneratePla
     pollingIntervalRef.current = window.setInterval(() => {
       pollCount++;
       pollRsvpStatus(attendeeIds);
-      if (pollCount >= 5) {
-        console.log('Max 5 RSVP polls reached, marking all as RSVP\'d and stopping.');
+      if (pollCount >= 30) {
+        console.log('Max 30 RSVP polls reached, marking all as RSVP\'d and stopping.');
         markAllAsRsvped(attendeeIds);
       }
     }, 2000);
@@ -168,6 +168,18 @@ export const AttendeeManager: React.FC<Props> = ({ onSetAttendees, onGeneratePla
       }
       const savedAttendees = await response.json();
       console.log('Saved attendees:', savedAttendees);
+
+      // Trigger Twilio calls for all attendees
+      try {
+        const callResponse = await fetch(`${BASE_URL}/events/${eventId}/call_attendees`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' }
+        });
+        const callResult = await callResponse.json();
+        console.log('Twilio call results:', callResult);
+      } catch (error) {
+        console.error('Error triggering Twilio calls:', error);
+      }
     } catch (error) {
       console.error('Error saving attendees:', error);
       return;
