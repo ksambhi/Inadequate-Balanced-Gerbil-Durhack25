@@ -1,6 +1,5 @@
 import React, { useState } from 'react';
 import type { SeatingPlan, EventSettings, Attendee } from '../../types/data.types';
-import * as colorVariables from '../../styles/_variables.scss'; // Import SCSS color variables
 import styles from './SeatingVisualizer.module.scss';
 
 // --- PROPS INTERFACE ---
@@ -79,14 +78,22 @@ const interpolateColor = (color1: number[], color2: number[], factor: number): s
  * Calculates a gradient color based on a numeric view value (0 to 1).
  * @param viewValue The numeric view value (0 to 1).
  * @param selectedView The current theme ('chocolate', 'age', etc.).
+ * @param settings The EventSettings object (REQUIRED to get the view index).
  * @returns A CSS RGB color string.
  */
-const getDynamicBackgroundColor = (viewValue: number, selectedView: string): string => {
-    const colors = TOPIC_COLOR_PALETTE.find((_, index) => {
-        // Map selectedView to an index based on its position in settings.views
-        const viewNames = ['chocolate', 'age', 'politics', 'football', 'music', 'travel', 'food', 'sports', 'movies', 'technology'];
-        return viewNames[index] === selectedView;
-    })!;
+const getDynamicBackgroundColor = (viewValue: number, selectedView: string, settings: EventSettings): string => {
+    // 1. Find the index of the selected view name in the settings array.
+    // This index corresponds to the position in TOPIC_COLOR_PALETTE.
+    const viewIndex = settings.views.indexOf(selectedView);
+
+    // 2. Look up the color pair using that index.
+    const colors = TOPIC_COLOR_PALETTE[viewIndex];
+
+    if (!colors) {
+      // If index is -1 (view not found) or outside the palette's range (0-9)
+      console.warn(`Color mapping failed for view: ${selectedView}. Using default.`);
+      return 'lightgray'; 
+    }
 
     // Color A is the '1' extreme, Color B is the '0' extreme
     const colorARgb = hexToRgb(colors.A);
@@ -114,11 +121,34 @@ const getCurrentViewValue = (attendee: Attendee, selectedView: string, settings:
     return attendee.views.views[viewIndex]; 
 };
 
-// --- COMPONENT START ---
 
 export const SeatingVisualizer: React.FC<Props> = ({ plan, settings }) => {
-  // State to control which view (e.g., 'chocolate', 'age') is currently coloring the chips
   const [selectedView, setSelectedView] = useState(settings.views[0] || 'chocolate');
+  const [tooltip, setTooltip] = useState<{
+    visible: boolean;
+    x: number;
+    y: number;
+    attendee: Attendee | null;
+  }>({
+    visible: false,
+    x: 0,
+    y: 0,
+    attendee: null
+  });
+
+  const handleMouseEnter = (e: React.MouseEvent, attendee: Attendee) => {
+    const rect = e.currentTarget.getBoundingClientRect();
+    setTooltip({
+      visible: true,
+      x: rect.left + rect.width / 2,
+      y: rect.top - 10,
+      attendee
+    });
+  };
+
+  const handleMouseLeave = () => {
+    setTooltip({ visible: false, x: 0, y: 0, attendee: null });
+  };
 
   return (
     <div className={styles.visualizerContainer}>
@@ -128,7 +158,6 @@ export const SeatingVisualizer: React.FC<Props> = ({ plan, settings }) => {
           The plan below shows seating based on the algorithm. Attendee colors reflect their views on the currently selected topic (gradient from **{TOPIC_COLOR_PALETTE.find((_, index) => settings.views[index] === selectedView)?.B || 'Color B'}** to **{TOPIC_COLOR_PALETTE.find((_, index) => settings.views[index] === selectedView)?.A || 'Color A'}**).
         </p>
 
-        {/* View Selector Dropdown */}
         <div className={styles.viewSelector}>
           <label htmlFor="view-select">Color by View:</label>
           <select
@@ -153,16 +182,17 @@ export const SeatingVisualizer: React.FC<Props> = ({ plan, settings }) => {
             </div>
             
             <div className={styles.attendeeGrid}>
-              {/* Render Attendees */}
               {table.attendees.map((attendee) => {
                   const viewValue = getCurrentViewValue(attendee, selectedView, settings);
-                  const dynamicColor = getDynamicBackgroundColor(viewValue, selectedView);
+                  const dynamicColor = getDynamicBackgroundColor(viewValue, selectedView, settings);
                   
                   return (
                       <div 
                           key={attendee.id} 
                           className={styles.attendeeChip}
                           style={{ backgroundColor: dynamicColor }}
+                          onMouseEnter={(e) => handleMouseEnter(e, attendee)}
+                          onMouseLeave={handleMouseLeave}
                       >
                           {attendee.name} 
                           <span className={styles.scoreText}>({(viewValue * 100).toFixed(0)}%)</span>
@@ -170,7 +200,6 @@ export const SeatingVisualizer: React.FC<Props> = ({ plan, settings }) => {
                   );
               })}
               
-              {/* Render Empty Seats (if necessary) */}
               {Array(table.capacity - table.attendees.length).fill(0).map((_, index) => (
                 <div key={`empty-${table.id}-${index}`} className={styles.emptySeat}>
                     (Empty)
@@ -180,6 +209,37 @@ export const SeatingVisualizer: React.FC<Props> = ({ plan, settings }) => {
           </div>
         ))}
       </div>
+
+      {/* Tooltip */}
+      {tooltip.visible && tooltip.attendee && (
+        <div
+          className={styles.tooltip}
+          style={{
+            left: `${tooltip.x}px`,
+            top: `${tooltip.y}px`,
+            transform: 'translate(-50%, -100%)'
+          }}
+        >
+          <div className={styles.tooltipContent}>
+            <h4>{tooltip.attendee.name}</h4>
+            <div className={styles.tooltipViews}>
+              {settings.views.map((viewName) => {
+                const value = getCurrentViewValue(tooltip.attendee!, viewName, settings);
+                return (
+                  <div key={viewName} className={styles.tooltipRow}>
+                    <span className={styles.tooltipLabel}>
+                      {viewName.charAt(0).toUpperCase() + viewName.slice(1)}:
+                    </span>
+                    <span className={styles.tooltipValue}>
+                      {(value * 100).toFixed(0)}%
+                    </span>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

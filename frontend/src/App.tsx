@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 // import './styles/global.scss'; // Ensure global styles are imported
+import './App.scss'
 import { EventCreationForm } from './components/EventCreationForm/EventCreationForm';
 import { AttendeeManager } from './components/AttendeeManager/AttendeeManager';
 import { SeatingVisualizer } from './components/SeatingVisualizer/SeatingVisualizer';
