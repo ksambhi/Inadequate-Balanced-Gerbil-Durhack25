@@ -20,6 +20,7 @@ class EventCreate(BaseModel):
     total_tables: int
     ppl_per_table: int
     chaos_temp: float
+    opinions: list[str] = []  # List of opinion questions for this event
 
 
 class EventResponse(BaseModel):
@@ -88,6 +89,17 @@ async def create_event(
     db.add(event)
     await db.commit()
     await db.refresh(event)
+    
+    # Create opinion questions for this event
+    for opinion_text in event_data.opinions:
+        opinion = Opinion(
+            opinion=opinion_text,
+            event_id=event.id
+        )
+        db.add(opinion)
+    
+    if event_data.opinions:
+        await db.commit()
     
     return event
 
