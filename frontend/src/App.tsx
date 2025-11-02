@@ -38,22 +38,10 @@ function App() {
   // 1. Called by EventCreationForm
   const handleEventCreate = (eventSettings: EventSettings) => {
     // Axios POST BASE_URL/events/create
-    axios
-      .post(`${BASE_URL}/events/create`, {
-        name: eventSettings.eventName,
-        total_tables: eventSettings.numberOfTables,
-        ppl_per_table: eventSettings.tableSize,
-        chaos_temp: eventSettings.chaosFactor,
-      })
-      .then((response) => {
-        console.log("Event created successfully:", response.data);
-        setEventId(response.data.id.toString());
-        setSettings(eventSettings);
-        setStep("MANAGE_ATTENDEES");
-      })
-      .catch((error) => {
-        console.error("Error creating event:", error);
-      });
+    /// @ts-expect-error: cba
+    setEventId(eventSettings.eventId);
+    setSettings(eventSettings);
+    setStep("MANAGE_ATTENDEES");
   };
 
   // 2. Called by AttendeeManager when invites are sent
