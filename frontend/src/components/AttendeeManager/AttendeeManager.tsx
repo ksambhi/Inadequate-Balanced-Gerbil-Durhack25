@@ -4,10 +4,12 @@ import styles from './AttendeeManager.module.scss';
 import { MOCK_ATTENDEES } from '../../hooks/useSeatingAlgorithm'; 
 
 interface Props {
+  onSetAttendees: (attendees: Attendee[]) => void;
   onGeneratePlan: (finalAttendees: Attendee[]) => void;
 }
 
-export const AttendeeManager: React.FC<Props> = ({ onGeneratePlan }) => {
+export const AttendeeManager: React.FC<Props> = ({ onSetAttendees, onGeneratePlan }) => {
+  // New state to manage an array of raw attendee objects (Name & Phone)
   const [rawAttendees, setRawAttendees] = useState<RawAttendee[]>([
     { id: '1', name: '', phoneNumber: '' }
   ]);
@@ -51,26 +53,15 @@ export const AttendeeManager: React.FC<Props> = ({ onGeneratePlan }) => {
     const finalData: Attendee[] = validAttendees.map((raw, index) => ({
       id: raw.id,
       name: raw.name,
-      views: MOCK_ATTENDEES[index % MOCK_ATTENDEES.length].views 
+      phone: raw.phoneNumber,
+      email: `attendee${index + 1}@example.com`,
+      // Assign mock view data to the corresponding input attendee
+      opinions: MOCK_ATTENDEES[index % MOCK_ATTENDEES.length].opinions
     }));
 
     setAttendeesWithViews(finalData);
-    setInvitesSent(true);
-
-    // MOCK: Simulate RSVPs coming in over time
-    simulateRsvps(validAttendees);
-  };
-
-  // Simulate RSVPs being received
-  const simulateRsvps = (attendees: RawAttendee[]) => {
-    attendees.forEach((attendee, index) => {
-      setTimeout(() => {
-        setRsvpStatus(prev => ({
-          ...prev,
-          [attendee.id]: true
-        }));
-      }, (index + 1) * 1500); // Stagger RSVPs by 1.5 seconds each
-    });
+    // Call the parent's onSetAttendees to handle the PUT request
+    onSetAttendees(finalData);
   };
 
   const totalInvited = rawAttendees.filter(a => a.name.trim() !== '').length;

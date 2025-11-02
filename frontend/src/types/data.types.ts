@@ -12,7 +12,9 @@ export interface RawAttendee {
 export interface Attendee {
   id: string;
   name: string;
-  views: AttendeeViews;
+  phone: string;
+  email: string;
+  opinions: AttendeeViews;
 }
 
 // The settings from the first page

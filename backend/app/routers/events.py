@@ -2,9 +2,10 @@ from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
+from sqlalchemy.orm import selectinload
 
 from app.database import get_db
-from app.models import Event, EventAttendee
+from app.models import Event, EventAttendee, JoinedOpinion, Opinion
 
 router = APIRouter(prefix="/api/events", tags=["events"])
 
@@ -36,6 +37,12 @@ class AttendeeCreate(BaseModel):
     email: str
 
 
+class OpinionAnswer(BaseModel):
+    """Schema for opinion question and answer."""
+    question: str
+    answer: str
+
+
 class AttendeeResponse(BaseModel):
     """Schema for attendee response."""
     id: int
@@ -45,6 +52,7 @@ class AttendeeResponse(BaseModel):
     table_no: int | None
     seat_no: int | None
     event_id: int
+    opinions: list[OpinionAnswer]
     
     class Config:
         from_attributes = True
@@ -95,13 +103,42 @@ async def get_attendees(
     if not event:
         raise HTTPException(status_code=404, detail="Event not found")
     
-    # Get all attendees for this event
+    # Get all attendees for this event with their opinions eagerly loaded
     result = await db.execute(
-        select(EventAttendee).where(EventAttendee.event_id == event_id)
+        select(EventAttendee)
+        .where(EventAttendee.event_id == event_id)
+        .options(selectinload(EventAttendee.opinions))
     )
     attendees = result.scalars().all()
     
-    return attendees
+    # Transform attendees to include opinion details
+    response = []
+    for attendee in attendees:
+        # Fetch opinion details for each joined opinion
+        opinion_answers = []
+        for joined_opinion in attendee.opinions:
+            opinion_result = await db.execute(
+                select(Opinion).where(Opinion.opinion_id == joined_opinion.opinion_id)
+            )
+            opinion = opinion_result.scalar_one_or_none()
+            if opinion:
+                opinion_answers.append({
+                    "question": opinion.opinion,
+                    "answer": joined_opinion.answer
+                })
+        
+        response.append(AttendeeResponse(
+            id=attendee.id,
+            name=attendee.name,
+            phone=attendee.phone,
+            email=attendee.email,
+            table_no=attendee.table_no,
+            seat_no=attendee.seat_no,
+            event_id=attendee.event_id,
+            opinions=opinion_answers
+        ))
+    
+    return response
 
 
 @router.put("/{event_id}/attendees", response_model=list[AttendeeResponse])
@@ -136,8 +173,19 @@ async def add_attendees(
     
     await db.commit()
     
-    # Refresh all attendees to get their IDs
+    # Refresh all attendees to get their IDs and load opinions
+    response = []
     for attendee in created_attendees:
         await db.refresh(attendee)
+        response.append(AttendeeResponse(
+            id=attendee.id,
+            name=attendee.name,
+            phone=attendee.phone,
+            email=attendee.email,
+            table_no=attendee.table_no,
+            seat_no=attendee.seat_no,
+            event_id=attendee.event_id,
+            opinions=[]  # New attendees have no opinions yet
+        ))
     
-    return created_attendees
+    return response
