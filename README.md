@@ -1,4 +1,4 @@
-# Sit Happens
+# [Sit Happens](https://devpost.com/software/sit-happens-r8nfuh)
 
 Have you ever wondered how to seat guests as messily as possible?
 
