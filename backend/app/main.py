@@ -2,6 +2,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from app.routers.hello import router as hello_router
+from app.routers.events import router as events_router
 
 app = FastAPI()
 
@@ -16,6 +17,7 @@ app.add_middleware(
 
 # Routers
 app.include_router(hello_router)
+app.include_router(events_router)
 
 
 # Optional: simple root to indicate service is up

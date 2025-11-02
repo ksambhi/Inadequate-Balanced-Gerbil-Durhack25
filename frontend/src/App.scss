@@ -1,0 +1,79 @@
+#root {
+  width: 100%;
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+  margin: 0;
+  padding: 0;
+}
+
+.app {
+  width: 100%;
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  margin: 0;
+  padding: 0;
+}
+
+.app-header {
+  text-align: center;
+  padding: clamp(2rem, 4vw, 4rem) clamp(1rem, 3vw, 3rem) clamp(1rem, 2vw, 2rem);
+  color: white;
+
+  h1 {
+    margin: 0 0 1rem;
+    font-size: clamp(2rem, 4vw, 3.5rem);
+    font-weight: 700;
+    text-shadow: 0 2px 4px rgba(0, 0, 0, 0.3);
+  }
+
+  p {
+    margin: 0;
+    font-size: clamp(1rem, 1.5vw, 1.25rem);
+    opacity: 0.9;
+    font-weight: 300;
+  }
+}
+
+.app-main {
+  flex: 1;
+  width: 100%;
+  display: block;
+  padding: 0;
+  
+  @media (max-width: 767px) {
+    padding: 1rem;
+  }
+}
+
+.app-footer {
+  text-align: center;
+  padding: 1.5rem;
+  color: rgba(255, 255, 255, 0.8);
+  font-size: 0.875rem;
+
+  p {
+    margin: 0;
+  }
+}
+
+// Responsive design
+@media (max-width: 768px) {
+  .app-header {
+    padding: 2rem 1rem 1.5rem;
+
+    h1 {
+      font-size: 2rem;
+    }
+
+    p {
+      font-size: 1rem;
+    }
+  }
+
+  .app-main {
+    padding: 1rem;
+  }
+}
