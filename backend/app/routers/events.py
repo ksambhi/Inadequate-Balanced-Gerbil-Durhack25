@@ -1,8 +1,9 @@
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, BackgroundTasks
 from pydantic import BaseModel
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, func
 from sqlalchemy.orm import selectinload
+import logging
 
 from app.database import get_db
 from app.models import Event, EventAttendee, JoinedOpinion, Opinion, Fact
@@ -10,6 +11,7 @@ from app.matching_agent import MatchingAgent, MatchResult
 from app.matcher_runner import MatcherRunner
 
 router = APIRouter(prefix="/api/events", tags=["events"])
+logger = logging.getLogger(__name__)
 
 
 class EventCreate(BaseModel):
@@ -340,3 +342,125 @@ async def allocate_seats(
         )
     
     return result
+
+
+async def run_matcher_background(event_id: int):
+    """
+    Background task to run the matcher for an event.
+    
+    This function runs the complete matching process:
+    1. Fetches all attendees for the event
+    2. Matches them into pairs using the AI agent
+    3. Allocates seats sequentially
+    4. Updates the database with seat assignments
+    
+    Logs progress similar to the create_and_run_event.py script.
+    
+    Args:
+        event_id: ID of the event to process
+    """
+    logger.info("="*60)
+    logger.info(f"STARTING BACKGROUND MATCHER FOR EVENT {event_id}")
+    logger.info("="*60)
+    
+    try:
+        # Run matcher with verbose logging
+        runner = MatcherRunner(verbose=True)
+        result = await runner.run(event_id=event_id)
+        
+        if result.get("success"):
+            logger.info("\n" + "="*60)
+            logger.info("MATCHING COMPLETE")
+            logger.info("="*60)
+            logger.info(f"Event: {result['event_name']} (ID: {event_id})")
+            logger.info(f"Attendees: {result['attendees_count']}")
+            logger.info(f"Pairs created: {result['pairs_created']}")
+            logger.info(f"People seated: {result['attendees_seated']}")
+            if result['attendees_unallocated'] > 0:
+                logger.info(
+                    f"Unallocated: {result['attendees_unallocated']}"
+                )
+            logger.info("="*60)
+        else:
+            logger.error("\n" + "="*60)
+            logger.error("MATCHING FAILED")
+            logger.error("="*60)
+            logger.error(f"Event ID: {event_id}")
+            logger.error(f"Error: {result.get('error')}")
+            logger.error("="*60)
+            
+    except Exception as e:
+        logger.error("\n" + "="*60)
+        logger.error("MATCHING ERROR")
+        logger.error("="*60)
+        logger.error(f"Event ID: {event_id}")
+        logger.error(f"Exception: {e}", exc_info=True)
+        logger.error("="*60)
+
+
+@router.post(
+    "/{event_id}/start_matching",
+    status_code=202,
+    response_model=dict
+)
+async def start_matching_background(
+    event_id: int,
+    background_tasks: BackgroundTasks,
+    db: AsyncSession = Depends(get_db)
+):
+    """
+    Start the matcher runner in the background for an event.
+    
+    Returns immediately with 202 Accepted while the matching process
+    runs in the background. Check logs for progress and results.
+    
+    This endpoint:
+    1. Validates the event exists
+    2. Starts the matching process in the background
+    3. Returns 202 Accepted immediately
+    
+    The background process will:
+    - Fetch all attendees for the event
+    - Match them into pairs using the AI agent
+    - Allocate seats sequentially
+    - Update the database with seat assignments
+    - Log progress and results
+    
+    Args:
+        event_id: ID of the event
+        background_tasks: FastAPI background tasks handler
+        db: Database session
+        
+    Returns:
+        Dict with status and message
+        
+    Raises:
+        HTTPException: 404 if event not found
+    """
+    # Validate event exists
+    query = select(Event).where(Event.id == event_id)
+    result = await db.execute(query)
+    event = result.scalar_one_or_none()
+    
+    if not event:
+        raise HTTPException(
+            status_code=404,
+            detail=f"Event with id {event_id} not found"
+        )
+    
+    # Start background task
+    background_tasks.add_task(run_matcher_background, event_id)
+    
+    logger.info(
+        f"Started background matching for event {event_id} ({event.name})"
+    )
+    
+    return {
+        "status": "accepted",
+        "message": (
+            f"Matching process started for event {event_id}. "
+            "Check logs for progress."
+        ),
+        "event_id": event_id,
+        "event_name": event.name
+    }
