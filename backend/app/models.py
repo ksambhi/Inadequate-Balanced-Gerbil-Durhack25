@@ -15,8 +15,9 @@ class Event(Base):
     ppl_per_table = Column(Integer, nullable=False)
     chaos_temp = Column(Float, nullable=False)
     
-    # Relationship to attendees
+    # Relationships
     attendees = relationship("EventAttendee", back_populates="event")
+    opinions = relationship("Opinion", back_populates="event")
     
     def __repr__(self):
         return f"<Event(id={self.id}, name={self.name})>"
@@ -67,12 +68,14 @@ class Opinion(Base):
     
     opinion_id = Column(Integer, primary_key=True, autoincrement=True, index=True)
     opinion = Column(String, nullable=False)
+    event_id = Column(Integer, ForeignKey("event.id"), nullable=False)
     
-    # Relationship
+    # Relationships
+    event = relationship("Event", back_populates="opinions")
     joined_opinions = relationship("JoinedOpinion", back_populates="opinion")
     
     def __repr__(self):
-        return f"<Opinion(id={self.opinion_id}, opinion={self.opinion})>"
+        return f"<Opinion(id={self.opinion_id}, opinion={self.opinion}, event_id={self.event_id})>"
 
 
 class JoinedOpinion(Base):
