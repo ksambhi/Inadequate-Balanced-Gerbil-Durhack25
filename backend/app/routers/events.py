@@ -1,7 +1,7 @@
 from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import select
+from sqlalchemy import select, func
 from sqlalchemy.orm import selectinload
 
 from app.database import get_db
@@ -189,3 +189,29 @@ async def add_attendees(
         ))
     
     return response
+
+
+@router.get("/{event_id}/count_rsvp")
+async def count_rsvp(
+    event_id: int,
+    db: AsyncSession = Depends(get_db)
+):
+    """Count attendees with RSVP true for an event."""
+    # Check if event exists
+    result = await db.execute(
+        select(Event).where(Event.id == event_id)
+    )
+    event = result.scalar_one_or_none()
+    
+    if not event:
+        raise HTTPException(status_code=404, detail="Event not found")
+    
+    # Count attendees with rsvp = True
+    result = await db.execute(
+        select(func.count(EventAttendee.id))
+        .where(EventAttendee.event_id == event_id)
+        .where(EventAttendee.rsvp == True)
+    )
+    count = result.scalar()
+    
+    return {"event_id": event_id, "rsvp_count": count}

@@ -1,5 +1,5 @@
 """ORM models."""
-from sqlalchemy import Column, Integer, String, Float, ForeignKey
+from sqlalchemy import Column, Integer, String, Float, ForeignKey, Boolean
 from sqlalchemy.orm import relationship
 from app.database import Base
 from pgvector.sqlalchemy import Vector
@@ -33,6 +33,8 @@ class EventAttendee(Base):
     table_no = Column(Integer, nullable=True)
     seat_no = Column(Integer, nullable=True)
     event_id = Column(Integer, ForeignKey("event.id"), nullable=False)
+    rsvp = Column(Boolean, nullable=False, default=False)
+    going = Column(Boolean, nullable=False, default=False)
     
     # Relationships
     event = relationship("Event", back_populates="attendees")
