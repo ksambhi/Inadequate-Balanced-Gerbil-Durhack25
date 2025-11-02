@@ -254,3 +254,56 @@ User's answer (integer only):"""
                 await db.refresh(jo)
         
         return joined_opinions
+    
+    def generate_fact_from_opinion(
+        self,
+        opinion_question: str,
+        score: int,
+        attendee_name: str
+    ) -> str:
+        """
+        Generate a natural language fact sentence from an opinion score.
+        
+        Args:
+            opinion_question: The opinion question
+            score: The score (0-10, where 0 is low and 10 is high)
+            attendee_name: Name of the attendee
+            
+        Returns:
+            A natural language fact sentence
+        """
+        prompt = f"""You are generating a natural language fact about a person based on their response to an opinion question.
+
+Person: {attendee_name}
+Question: {opinion_question}
+Score: {score}/10 (where 0 is low/negative and 10 is high/positive)
+
+Generate a concise, third-person fact sentence about this person that captures their opinion.
+The sentence should be 1-2 short sentences maximum.
+Make it conversational and natural, as if describing the person to someone else.
+
+Examples:
+- Question: "How much do you enjoy outdoor activities?" Score: 9 → "Loves outdoor activities and nature"
+- Question: "How interested are you in technology?" Score: 3 → "Has limited interest in technology"
+- Question: "How much do you like spicy food?" Score: 10 → "Absolutely loves spicy food"
+- Question: "Are you a morning person?" Score: 2 → "Definitely not a morning person"
+
+Generate ONLY the fact sentence, no extra text:"""
+
+        try:
+            response = self.model.generate_content(prompt)
+            fact_text = response.text.strip()
+            
+            # Remove quotes if present
+            if fact_text.startswith('"') and fact_text.endswith('"'):
+                fact_text = fact_text[1:-1]
+            if fact_text.startswith("'") and fact_text.endswith("'"):
+                fact_text = fact_text[1:-1]
+            
+            return fact_text
+            
+        except Exception as e:
+            print(f"Error generating fact from opinion: {e}")
+            # Fallback to a simple template
+            intensity = "strongly" if score >= 8 else "somewhat" if score >= 5 else "not very"
+            return f"{intensity} interested in: {opinion_question}"

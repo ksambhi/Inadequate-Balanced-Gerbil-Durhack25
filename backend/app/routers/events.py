@@ -11,6 +11,8 @@ from app.database import get_db
 from app.models import Event, EventAttendee, JoinedOpinion, Opinion, Fact
 from app.matching_agent import MatchingAgent, MatchResult
 from app.matcher_runner import MatcherRunner
+from app.gemini_service import GeminiProcessor
+from app.matcher import EmbeddingService
 
 router = APIRouter(prefix="/api/events", tags=["events"])
 logger = logging.getLogger(__name__)
@@ -294,6 +296,9 @@ async def call_attendees(event_id: int, db: AsyncSession = Depends(get_db)):
     """Trigger outbound calls for all attendees of an event using ElevenLabs API."""
     import random
     
+    # Initialize Gemini service for generating facts from opinions
+    gemini_service = GeminiProcessor()
+    
     # Get all opinions for this event
     opinions_result = await db.execute(
         select(Opinion).where(Opinion.event_id == event_id)
@@ -317,12 +322,31 @@ async def call_attendees(event_id: int, db: AsyncSession = Depends(get_db)):
                     )
                 )
                 if not existing.scalar_one_or_none():
+                    # Generate random score
+                    score = random.randint(0, 10)
+                    
+                    # Create joined opinion
                     joined_opinion = JoinedOpinion(
                         attendee_id=attendee.id,
                         opinion_id=opinion.opinion_id,
-                        answer=random.randint(0, 10)
+                        answer=score
                     )
                     db.add(joined_opinion)
+                    
+                    # Generate fact sentence from opinion using LLM
+                    fact_text = gemini_service.generate_fact_from_opinion(
+                        opinion_question=opinion.opinion,
+                        score=score,
+                        attendee_name=attendee.name
+                    )
+                    
+                    # Store the fact
+                    fact = Fact(
+                        fact=fact_text,
+                        attendee_id=attendee.id
+                    )
+                    db.add(fact)
+            
             await db.commit()
             continue
         call_response = make_elevenlabs_call(attendee.phone, user=attendee.name, event_id=event_id, user_id=attendee.id)
