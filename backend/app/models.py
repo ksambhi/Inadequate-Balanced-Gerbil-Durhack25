@@ -2,6 +2,7 @@
 from sqlalchemy import Column, Integer, String, Float, ForeignKey
 from sqlalchemy.orm import relationship
 from app.database import Base
+from pgvector.sqlalchemy import Vector
 
 
 class Event(Base):
@@ -49,6 +50,7 @@ class Fact(Base):
     id = Column(Integer, primary_key=True, autoincrement=True, index=True)
     fact = Column(String, nullable=False)
     attendee_id = Column(Integer, ForeignKey("event_attendee.id"), nullable=False)
+    embedding = Column(Vector(768), nullable=True)  # 768 dimensions for Gemini embeddings
     
     # Relationship
     attendee = relationship("EventAttendee", back_populates="facts")
