@@ -47,7 +47,7 @@ class AttendeeCreate(BaseModel):
 class OpinionAnswer(BaseModel):
     """Schema for opinion question and answer."""
     question: str
-    answer: str
+    answer: int
 
 
 class AttendeeResponse(BaseModel):

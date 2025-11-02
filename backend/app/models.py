@@ -85,7 +85,7 @@ class JoinedOpinion(Base):
     id = Column(Integer, primary_key=True, autoincrement=True, index=True)
     attendee_id = Column(Integer, ForeignKey("event_attendee.id"), nullable=False)
     opinion_id = Column(Integer, ForeignKey("opinion.opinion_id"), nullable=False)
-    answer = Column(String, nullable=False)
+    answer = Column(Integer, nullable=False)
     
     # Relationships
     attendee = relationship("EventAttendee", back_populates="opinions")
