@@ -4,8 +4,8 @@ Matcher Runner for allocating seating pairs for an event.
 This module orchestrates the matching process:
 1. Fetches all attendees for an event
 2. Matches attendees in pairs using the AI agent
-3. Allocates seats sequentially (table 0 seat 0, seat 1, table 1 seat 0...)
-4. Updates the database with seat assignments
+3. Allocates seats immediately after each match (table 0 seat 0, seat 1, table 1 seat 0...)
+4. Updates the database with seat assignments in real-time
 """
 import logging
 from typing import List, Tuple, Optional
@@ -118,22 +118,25 @@ class MatcherRunner:
         
         return facts_list, opinions_list
     
-    async def match_pairs(
+    async def match_pairs_and_allocate(
         self,
         event_id: int,
+        event: Event,
         chaos_level: float,
         session: AsyncSession
-    ) -> List[Tuple[int, int]]:
+    ) -> dict:
         """
-        Match all attendees into pairs using the AI agent.
+        Match all attendees into pairs using the AI agent and allocate seats
+        immediately after each match.
         
         Args:
             event_id: ID of the event
+            event: Event instance
             chaos_level: Chaos level for matching (0-10)
             session: Database session
             
         Returns:
-            List of (attendee_id_1, attendee_id_2) tuples
+            Dict with matching results
         """
         # Get all attendees
         attendees = await self.get_attendees(event_id, session)
@@ -143,14 +146,22 @@ class MatcherRunner:
                 f"Event {event_id} has {len(attendees)} attendees. "
                 "Need at least 2 for pairing."
             )
-            return []
+            return {
+                "pairs_created": 0,
+                "attendees_seated": 0,
+                "attendees_unallocated": len(attendees)
+            }
         
         logger.info(f"Starting pairing for {len(attendees)} attendees")
         
         # Create set of all attendee IDs
         all_attendee_ids = {att.id for att in attendees}
         unallocated = all_attendee_ids.copy()
-        pairs = []
+        pairs_created = 0
+        seat_index = 0
+        ppl_per_table = event.ppl_per_table
+        total_tables = event.total_tables
+        total_capacity = total_tables * ppl_per_table
         
         # Keep matching until we can't find more pairs
         while len(unallocated) >= 2:
@@ -216,8 +227,42 @@ class MatcherRunner:
                 logger.info(f"  Reasoning: {result.reasoning}")
                 logger.info(f"  Confidence: {result.confidence:.2f}")
                 
-                # Add pair and remove from unallocated
-                pairs.append((current_attendee_id, matched_id))
+                # Immediately allocate seats for this pair
+                for attendee_id in [current_attendee_id, matched_id]:
+                    # Check if we've exceeded table capacity
+                    if seat_index >= total_capacity:
+                        logger.error(
+                            f"Ran out of seats! Cannot seat attendee {attendee_id}"
+                        )
+                        break
+                    
+                    # Calculate table and seat number
+                    table_no = seat_index // ppl_per_table
+                    seat_no = seat_index % ppl_per_table
+                    
+                    # Update attendee in database
+                    query = select(EventAttendee).where(
+                        EventAttendee.id == attendee_id
+                    )
+                    result_attendee = await session.execute(query)
+                    attendee = result_attendee.scalar_one_or_none()
+                    
+                    if attendee:
+                        attendee.table_no = table_no
+                        attendee.seat_no = seat_no
+                        logger.info(
+                            f"  → Assigned attendee {attendee_id} ({attendee.name}) "
+                            f"to table {table_no}, seat {seat_no}"
+                        )
+                        seat_index += 1
+                    else:
+                        logger.error(f"Attendee {attendee_id} not found in database")
+                
+                # Commit the seat assignments immediately
+                await session.commit()
+                
+                # Remove from unallocated
+                pairs_created += 1
                 unallocated.remove(current_attendee_id)
                 unallocated.remove(matched_id)
                 
@@ -235,87 +280,13 @@ class MatcherRunner:
                 f"Odd number of attendees. {remaining} will be unallocated."
             )
         
-        logger.info(f"\nMatching complete: {len(pairs)} pairs created")
-        return pairs
-    
-    async def allocate_seats(
-        self,
-        pairs: List[Tuple[int, int]],
-        event: Event,
-        session: AsyncSession
-    ) -> None:
-        """
-        Allocate seats to pairs sequentially.
+        logger.info(f"\nMatching complete: {pairs_created} pairs created")
         
-        Seats are allocated starting from table 0 seat 0, then table 0 seat 1,
-        then table 1 seat 0, etc.
-        
-        Args:
-            pairs: List of (attendee_id_1, attendee_id_2) tuples
-            event: Event instance
-            session: Database session
-        """
-        ppl_per_table = event.ppl_per_table
-        total_tables = event.total_tables
-        
-        logger.info(
-            f"Allocating {len(pairs) * 2} attendees to seats "
-            f"({total_tables} tables, {ppl_per_table} per table)"
-        )
-        
-        # Flatten pairs into seat assignments
-        seat_assignments = []
-        for attendee1_id, attendee2_id in pairs:
-            seat_assignments.append(attendee1_id)
-            seat_assignments.append(attendee2_id)
-        
-        # Check capacity
-        total_capacity = total_tables * ppl_per_table
-        if len(seat_assignments) > total_capacity:
-            logger.warning(
-                f"Not enough capacity! Need {len(seat_assignments)} seats, "
-                f"have {total_capacity}"
-            )
-        
-        # Allocate seats sequentially
-        seat_index = 0
-        for attendee_id in seat_assignments:
-            # Calculate table and seat number
-            table_no = seat_index // ppl_per_table
-            seat_no = seat_index % ppl_per_table
-            
-            # Check if we've exceeded table capacity
-            if table_no >= total_tables:
-                logger.error(
-                    f"Ran out of tables! Cannot seat attendee {attendee_id}"
-                )
-                break
-            
-            # Update attendee in database
-            query = select(EventAttendee).where(
-                EventAttendee.id == attendee_id
-            )
-            result = await session.execute(query)
-            attendee = result.scalar_one_or_none()
-            
-            if attendee:
-                attendee.table_no = table_no
-                attendee.seat_no = seat_no
-                logger.info(
-                    f"Assigned attendee {attendee_id} ({attendee.name}) "
-                    f"to table {table_no}, seat {seat_no}"
-                )
-            else:
-                logger.error(f"Attendee {attendee_id} not found in database")
-            
-            seat_index += 1
-        
-        # Commit all changes
-        await session.commit()
-        logger.info(
-            f"✓ Seat allocation complete. "
-            f"Assigned {seat_index} attendees to seats."
-        )
+        return {
+            "pairs_created": pairs_created,
+            "attendees_seated": pairs_created * 2,
+            "attendees_unallocated": len(unallocated)
+        }
     
     async def run(self, event_id: int) -> dict:
         """
@@ -363,14 +334,15 @@ class MatcherRunner:
                     "attendees_count": len(attendees)
                 }
             
-            # 3. Match pairs
-            pairs = await self.match_pairs(
+            # 3. Match pairs and allocate seats immediately
+            result = await self.match_pairs_and_allocate(
                 event_id,
+                event,
                 event.chaos_temp,
                 session
             )
             
-            if not pairs:
+            if result["pairs_created"] == 0:
                 error_msg = "No pairs could be created"
                 logger.error(error_msg)
                 return {
@@ -379,9 +351,6 @@ class MatcherRunner:
                     "attendees_count": len(attendees),
                     "pairs_created": 0
                 }
-            
-            # 4. Allocate seats
-            await self.allocate_seats(pairs, event, session)
             
             logger.info("="*60)
             logger.info("MATCHER RUNNER COMPLETE")
@@ -392,9 +361,9 @@ class MatcherRunner:
                 "event_id": event_id,
                 "event_name": event.name,
                 "attendees_count": len(attendees),
-                "pairs_created": len(pairs),
-                "attendees_seated": len(pairs) * 2,
-                "attendees_unallocated": len(attendees) - (len(pairs) * 2)
+                "pairs_created": result["pairs_created"],
+                "attendees_seated": result["attendees_seated"],
+                "attendees_unallocated": result["attendees_unallocated"]
             }
 
 
