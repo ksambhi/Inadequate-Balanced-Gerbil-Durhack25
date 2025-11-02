@@ -1,51 +1,244 @@
 .formContainer {
   display: flex;
   flex-direction: column;
-  gap: 1.5rem;
-  max-width: 500px;
+  gap: 2rem;
+  max-width: 560px;
   margin: 2rem auto;
-  padding: 2rem;
-  border-radius: 8px;
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+  padding: 3rem 2.5rem;
+  border-radius: 16px;
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.08);
+  background: linear-gradient(to bottom, #ffffff, #f8f9fa);
+  border: 1px solid rgba(0, 0, 0, 0.05);
 }
 
 .formField {
   display: flex;
   flex-direction: column;
-  gap: 0.5rem;
+  gap: 0.75rem;
 
   label {
-    font-weight: bold;
+    font-weight: 600;
+    font-size: 0.95rem;
+    color: #1a1a1a;
+    letter-spacing: 0.2px;
   }
 
   input[type="text"],
   input[type="number"] {
-    padding: 0.75rem;
-    border: 1px solid #ccc;
-    border-radius: 4px;
+    padding: 12px 16px;
+    border: 2px solid #dee2e6;
+    border-radius: 10px;
+    font-size: 1rem;
+    color: #495057;
+    background-color: white;
+    transition: all 0.2s ease;
+    font-family: inherit;
+
+    &:hover {
+      border-color: #adb5bd;
+    }
+
+    &:focus {
+      outline: none;
+      border-color: #667eea;
+      box-shadow: 0 0 0 4px rgba(102, 126, 234, 0.1);
+      background-color: #ffffff;
+    }
+
+    &::placeholder {
+      color: #adb5bd;
+    }
+  }
+
+  input[type="number"] {
+    appearance: textfield;
+    
+    &::-webkit-outer-spin-button,
+    &::-webkit-inner-spin-button {
+      -webkit-appearance: none;
+      margin: 0;
+    }
+  }
+
+  .sliderContainer {
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+    width: 100%;
+  }
+
+  .sliderLabel {
+    font-size: 0.875rem;
+    color: #6c757d;
+    font-weight: 500;
+    min-width: fit-content;
+    white-space: nowrap;
   }
 
   .slider {
-    margin: 0 0.5rem;
+  flex: 1;
+  -webkit-appearance: none;
+  appearance: none;
+  height: 8px;
+  border-radius: 4px;
+  background: linear-gradient(to right, #e9ecef 0%, #dee2e6 100%);
+  outline: none;
+  cursor: pointer;
+  transition: all 0.2s ease;
+
+  &:hover {
+    background: linear-gradient(to right, #dee2e6 0%, #ced4da 100%);
   }
 
-  span {
-    font-size: 0.8rem;
-    color: #555;
+  &::-webkit-slider-thumb {
+    -webkit-appearance: none;
+    appearance: none;
+    width: 24px;
+    height: 24px;
+    border-radius: 50%;
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    cursor: pointer;
+    box-shadow: 0 2px 8px rgba(102, 126, 234, 0.4);
+    transition: all 0.2s ease;
+    margin-top: -8px; // This centers it vertically
+
+    &:hover {
+      transform: scale(1.1);
+      box-shadow: 0 4px 12px rgba(102, 126, 234, 0.5);
+    }
+
+    &:active {
+      transform: scale(1.05);
+    }
+  }
+
+  &::-moz-range-thumb {
+    width: 24px;
+    height: 24px;
+    border-radius: 50%;
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    cursor: pointer;
+    border: none;
+    box-shadow: 0 2px 8px rgba(102, 126, 234, 0.4);
+    transition: all 0.2s ease;
+
+    &:hover {
+      transform: scale(1.1);
+      box-shadow: 0 4px 12px rgba(102, 126, 234, 0.5);
+    }
+
+    &:active {
+      transform: scale(1.05);
+    }
+  }
+
+  &::-webkit-slider-runnable-track {
+    height: 8px;
+    border-radius: 4px;
+    background: transparent;
+  }
+
+  &::-moz-range-track {
+    height: 8px;
+    border-radius: 4px;
+    background: transparent;
   }
 }
 
+  span:not(.sliderLabel) {
+    font-size: 0.875rem;
+    color: #6c757d;
+    font-weight: 500;
+  }
+}
+
+
 .submitButton {
-  padding: 1rem;
-  background-color: #007bff;
+  padding: 14px 24px;
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
   color: white;
   border: none;
-  border-radius: 4px;
-  font-size: 1rem;
+  border-radius: 12px;
+  font-size: 1.05rem;
+  font-weight: 600;
   cursor: pointer;
-  transition: background-color 0.2s;
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  box-shadow: 0 4px 12px rgba(102, 126, 234, 0.3);
+  letter-spacing: 0.5px;
+  margin-top: 0.5rem;
+  position: relative;
+  overflow: hidden;
+
+  &::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: -100%;
+    width: 100%;
+    height: 100%;
+    background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.3), transparent);
+    transition: left 0.5s ease;
+  }
 
   &:hover {
-    background-color: #0056b3;
+    transform: translateY(-2px);
+    box-shadow: 0 6px 20px rgba(102, 126, 234, 0.4);
+
+    &::before {
+      left: 100%;
+    }
+  }
+
+  &:active {
+    transform: translateY(0);
+    box-shadow: 0 2px 8px rgba(102, 126, 234, 0.3);
+  }
+
+  &:disabled {
+    background: #e9ecef;
+    color: #adb5bd;
+    cursor: not-allowed;
+    transform: none;
+    box-shadow: none;
+
+    &:hover {
+      transform: none;
+      box-shadow: none;
+    }
+  }
+}
+
+/* Optional: Add a form title style if needed */
+.formContainer h2,
+.formContainer h3 {
+  margin: 0 0 0.5rem 0;
+  font-size: 1.75rem;
+  font-weight: 700;
+  color: #1a1a1a;
+  letter-spacing: -0.5px;
+  text-align: center;
+}
+
+/* Responsive adjustments */
+@media (max-width: 768px) {
+  .formContainer {
+    padding: 2rem 1.5rem;
+    margin: 1rem auto;
+    gap: 1.5rem;
+  }
+
+  .formField {
+    gap: 0.5rem;
+
+    input[type="text"],
+    input[type="number"] {
+      padding: 10px 14px;
+      font-size: 0.95rem;
+    }
+  }
+
+  .submitButton {
+    padding: 12px 20px;
+    font-size: 1rem;
   }
 }

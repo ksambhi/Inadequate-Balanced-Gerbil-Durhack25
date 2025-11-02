@@ -1,68 +1,118 @@
 .managerContainer {
     display: flex;
     flex-direction: column;
-    gap: 1.5rem;
-    padding: 2rem;
-    border-radius: 8px;
-    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
-    background-color: white;
+    gap: 2rem;
+    padding: 3rem 2.5rem;
+    border-radius: 16px;
+    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.08);
+    background: linear-gradient(to bottom, #ffffff, #f8f9fa);
+    border: 1px solid rgba(0, 0, 0, 0.05);
     width: 100%;
-    max-width: 600px; /* Give the container a reasonable max width */
+    max-width: 700px;
+    margin: 2rem auto;
 }
 
 h2 {
-    margin-top: 0;
+    margin: 0 0 1rem 0;
     text-align: center;
+    font-size: 2rem;
+    font-weight: 700;
+    color: #1a1a1a;
+    letter-spacing: -0.5px;
 }
 
 .attendeeList {
     display: flex;
     flex-direction: column;
-    gap: 0.5rem;
+    gap: 0.75rem;
 }
 
-// Styles for the headers and the input rows
 .headerRow, .inputRow {
     display: grid;
-    // Creates a grid with two main columns (Name, Phone) and a small action column
     grid-template-columns: 3fr 2fr min-content; 
     align-items: center;
-    gap: 10px;
+    gap: 12px;
 }
 
 .headerRow {
-    padding-bottom: 5px;
-    border-bottom: 1px solid #ccc;
-    margin-bottom: 5px;
+    padding-bottom: 10px;
+    border-bottom: 2px solid #e9ecef;
+    margin-bottom: 8px;
+    font-weight: 600;
+    font-size: 0.95rem;
+    color: #495057;
+    letter-spacing: 0.2px;
 }
 
-.inputRow input {
-    padding: 8px;
-    border: 1px solid #ddd;
-    border-radius: 4px;
+.inputRow {
+    transition: all 0.2s ease;
+    
+    input {
+        padding: 12px 16px;
+        border: 2px solid #dee2e6;
+        border-radius: 10px;
+        font-size: 1rem;
+        color: #495057;
+        background-color: white;
+        transition: all 0.2s ease;
+        font-family: inherit;
+
+        &:hover {
+            border-color: #adb5bd;
+        }
+
+        &:focus {
+            outline: none;
+            border-color: #667eea;
+            box-shadow: 0 0 0 4px rgba(102, 126, 234, 0.1);
+        }
+
+        &::placeholder {
+            color: #adb5bd;
+        }
+    }
 }
 
 .addButton {
-    margin-top: 0.5rem;
-    padding: 8px;
-    background-color: #f0f0f0;
-    border: 1px dashed #ccc;
-    border-radius: 4px;
+    margin-top: 1rem;
+    padding: 12px 20px;
+    background-color: white;
+    border: 2px dashed #adb5bd;
+    border-radius: 10px;
     cursor: pointer;
+    font-weight: 600;
+    color: #495057;
+    transition: all 0.2s ease;
+    font-size: 0.95rem;
+
+    &:hover {
+        border-color: #667eea;
+        color: #667eea;
+        background-color: rgba(102, 126, 234, 0.05);
+    }
+
+    &:active {
+        transform: scale(0.98);
+    }
 }
 
 .removeButton {
-    padding: 6px 8px;
+    padding: 8px 10px;
     background: none;
     border: none;
     cursor: pointer;
-    font-size: 1.2rem;
-    opacity: 0.7;
-    transition: opacity 0.2s;
+    font-size: 1.3rem;
+    color: #adb5bd;
+    transition: all 0.2s ease;
+    border-radius: 6px;
     
     &:hover:not(:disabled) {
-        opacity: 1;
-        color: red;
+        color: #dc3545;
+        background-color: rgba(220, 53, 69, 0.1);
+    }
+
+    &:active:not(:disabled) {
+        transform: scale(0.9);
     }
 
     &:disabled {
@@ -71,39 +121,108 @@ h2 {
     }
 }
 
-// Button Styles
 .inviteButton, .generateButton {
-    padding: 10px 15px;
+    padding: 14px 24px;
     border: none;
-    border-radius: 4px;
-    font-weight: bold;
+    border-radius: 12px;
+    font-weight: 600;
     cursor: pointer;
-    transition: background-color 0.2s;
+    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    font-size: 1.05rem;
+    letter-spacing: 0.5px;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+    position: relative;
+    overflow: hidden;
+
+    &::before {
+        content: '';
+        position: absolute;
+        top: 0;
+        left: -100%;
+        width: 100%;
+        height: 100%;
+        background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.3), transparent);
+        transition: left 0.5s ease;
+    }
+
+    &:hover:not(:disabled) {
+        transform: translateY(-2px);
+        
+        &::before {
+            left: 100%;
+        }
+    }
+
+    &:active:not(:disabled) {
+        transform: translateY(0);
+    }
+
+    &:disabled {
+        opacity: 0.6;
+        cursor: not-allowed;
+        transform: none;
+        box-shadow: none;
+    }
 }
 
 .inviteButton {
-    background-color: #007bff;
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
     color: white;
     
     &:hover:not(:disabled) {
-        background-color: #0056b3;
+        box-shadow: 0 6px 20px rgba(102, 126, 234, 0.4);
     }
 }
 
 .generateButton {
-    background-color: #28a745;
+    background: linear-gradient(135deg, #28a745 0%, #20c997 100%);
     color: white;
     
-    &:hover {
-        background-color: #1e7e34;
+    &:hover:not(:disabled) {
+        box-shadow: 0 6px 20px rgba(40, 167, 69, 0.4);
     }
 }
 
 .dataLoadedSection {
-    margin-top: 1rem;
-    padding: 1rem;
-    border: 1px solid #28a745;
-    border-radius: 4px;
-    background-color: #e6ffed;
+    margin-top: 1.5rem;
+    padding: 1.5rem;
+    border: 2px solid #28a745;
+    border-radius: 12px;
+    background: linear-gradient(135deg, #d4edda 0%, #c3e6cb 100%);
     text-align: center;
+    box-shadow: 0 4px 12px rgba(40, 167, 69, 0.15);
+
+    p {
+        margin: 0;
+        font-weight: 600;
+        color: #155724;
+        font-size: 1rem;
+    }
+}
+
+// Responsive adjustments
+@media (max-width: 768px) {
+    .managerContainer {
+        padding: 2rem 1.5rem;
+        max-width: 100%;
+    }
+
+    h2 {
+        font-size: 1.5rem;
+    }
+
+    .headerRow, .inputRow {
+        grid-template-columns: 2fr 1.5fr min-content;
+        gap: 8px;
+    }
+
+    .inputRow input {
+        padding: 10px 14px;
+        font-size: 0.95rem;
+    }
+
+    .inviteButton, .generateButton {
+        padding: 12px 20px;
+        font-size: 1rem;
+    }
 }

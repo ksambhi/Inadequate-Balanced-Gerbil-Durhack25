@@ -13,7 +13,7 @@
   min-height: 100vh;
   display: flex;
   flex-direction: column;
-  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  // background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
   margin: 0;
   padding: 0;
 }
@@ -91,7 +91,8 @@ body {
                  "Helvetica Neue", Arial, sans-serif, "Apple Color Emoji", 
                  "Segoe UI Emoji", "Segoe UI Symbol";
                  
-    background-color: #f8f8f8; 
+    
+    background-image: url('../public/background.png');
 }
 
 /* Any other global styles you have here */

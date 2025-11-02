@@ -1,171 +1,300 @@
 /* Import variables if you are using a separate _variables.scss file */
-/* If you don't use variables, delete this line and replace v.$... with hardcoded hex codes */
 @use '../../styles/_variables' as v; 
 
 /* --- 1. Main Layout & Header --- */
 .visualizerContainer {
     display: flex;
     flex-direction: column;
-    gap: 2rem;
-    padding: 2rem;
-    background-color: white;
-    border-radius: 8px;
-    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+    gap: 2.5rem;
+    padding: 3rem 2rem;
+    background: linear-gradient(to bottom, #ffffff, #f8f9fa);
+    border-radius: 16px;
+    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.08);
     width: 90%;
-    max-width: 1000px;
+    max-width: 1200px;
     margin: 2rem auto;
+    border: 1px solid rgba(0, 0, 0, 0.05);
 }
 
 .header {
     text-align: center;
-    border-bottom: 1px solid #eee;
-    padding-bottom: 1rem;
+    padding-bottom: 1.5rem;
+    border-bottom: 2px solid #e9ecef;
+    
+    h2 {
+        margin: 0 0 1rem;
+        font-size: 2rem;
+        font-weight: 700;
+        color: #1a1a1a;
+        letter-spacing: -0.5px;
+    }
 }
 
 .description {
-    font-style: italic;
-    color: #666;
-    margin-top: 0.5rem;
+    font-size: 0.95rem;
+    color: #6c757d;
+    margin-top: 0.75rem;
+    line-height: 1.6;
+    max-width: 700px;
+    margin-left: auto;
+    margin-right: auto;
 }
 
 .viewSelector {
     display: flex;
     justify-content: center;
     align-items: center;
-    gap: 10px;
-    margin-top: 1rem;
+    gap: 12px;
+    margin-top: 1.5rem;
+
+    label {
+        font-weight: 600;
+        color: #495057;
+        font-size: 0.95rem;
+    }
 
     select {
-        padding: 8px 12px;
-        border-radius: 4px;
-        border: 1px solid #ccc;
+        padding: 10px 16px;
+        border-radius: 8px;
+        border: 2px solid #dee2e6;
+        background-color: white;
+        font-size: 0.95rem;
+        font-weight: 500;
+        color: #495057;
+        cursor: pointer;
+        transition: all 0.2s ease;
+        min-width: 180px;
+
+        &:hover {
+            border-color: #adb5bd;
+        }
+
+        &:focus {
+            outline: none;
+            border-color: #667eea;
+            box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
+        }
     }
 }
 
 /* --- 2. Seating Layout --- */
 
 .seatingLayout {
-    display: flex;
-    flex-wrap: wrap;
-    gap: 3rem;
-    justify-content: center; /* Centers the tables on the page */
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
+    gap: 2rem;
+    padding: 1rem;
 }
 
 .tableContainer {
     display: flex;
     flex-direction: column;
     align-items: center;
-    gap: 1rem;
-    padding: 1rem;
-    // Use the variables for basic table styling
-    background-color: v.$table-color; 
-    border: 1px solid v.$table-border;
-    border-radius: 8px;
-    min-width: 280px;
-    box-shadow: 0 2px 5px rgba(0, 0, 0, 0.1);
+    gap: 1.25rem;
+    padding: 1.75rem 1.5rem;
+    background: white;
+    border: 2px solid #e9ecef;
+    border-radius: 16px;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.05);
+    transition: all 0.3s ease;
+
+    &:hover {
+        transform: translateY(-4px);
+        box-shadow: 0 8px 24px rgba(0, 0, 0, 0.1);
+        border-color: #dee2e6;
+    }
 }
 
 .table {
-    font-size: 1.2rem;
-    font-weight: bold;
-    color: v.$chip-text-color;
-    padding: 10px 20px;
-    border-radius: 50%; /* Makes the table label look like a table top */
-    background-color: #d0d0d0;
-    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+    font-size: 1.1rem;
+    font-weight: 700;
+    color: #495057;
+    padding: 12px 28px;
+    border-radius: 50px;
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    color: white;
+    box-shadow: 0 4px 12px rgba(102, 126, 234, 0.3);
+    letter-spacing: 0.5px;
+    text-transform: uppercase;
+    font-size: 0.85rem;
 }
 
 /* --- 3. Attendee Chips (The Grid) --- */
 
 .attendeeGrid {
-    // CRITICAL: This class was missing. It makes the chips wrap horizontally.
     display: flex;
     flex-wrap: wrap;
-    gap: 10px; /* Space between the chips */
+    gap: 12px;
     justify-content: center;
-    max-width: 300px;
+    max-width: 100%;
+    padding: 0.5rem;
 }
 
 .attendeeChip {
-    // This is the styled element for each person.
-    padding: 8px 12px;
-    border-radius: 20px;
-    color: v.$chip-text-color; 
+    padding: 12px 18px;
+    border-radius: 12px;
+    color: white;
     font-size: 0.9rem;
-    font-weight: 500;
+    font-weight: 600;
     text-align: center;
-    min-width: 100px;
-    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.15);
-    transition: background-color 0.3s ease;
-    border: 1px solid rgba(0, 0, 0, 0.2);
+    min-width: 120px;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
+    transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+    border: none;
+    cursor: pointer;
+    position: relative;
+    overflow: hidden;
+
+    &::before {
+        content: '';
+        position: absolute;
+        top: 0;
+        left: 0;
+        right: 0;
+        bottom: 0;
+        background: linear-gradient(135deg, rgba(255,255,255,0.2) 0%, rgba(255,255,255,0) 100%);
+        opacity: 0;
+        transition: opacity 0.2s ease;
+    }
+
+    &:hover {
+        transform: translateY(-3px);
+        box-shadow: 0 6px 20px rgba(0, 0, 0, 0.2);
+
+        &::before {
+            opacity: 1;
+        }
+    }
+
+    &:active {
+        transform: translateY(-1px);
+    }
 
     .scoreText {
-        font-size: 0.75rem;
-        opacity: 0.8;
-        margin-left: 5px;
+        font-size: 0.8rem;
+        opacity: 0.9;
+        margin-left: 6px;
+        font-weight: 500;
     }
 }
 
 .emptySeat {
-    // Styling for the placeholder empty seats.
-    padding: 8px 12px;
-    border-radius: 20px;
-    border: 2px dashed v.$empty-seat-border;
-    color: #aaa;
+    padding: 12px 18px;
+    border-radius: 12px;
+    border: 2px dashed #ced4da;
+    color: #adb5bd;
     font-style: italic;
-    min-width: 100px;
+    font-size: 0.85rem;
+    min-width: 120px;
     text-align: center;
-    background-color: transparent;
+    background-color: #f8f9fa;
+    transition: all 0.2s ease;
+
+    &:hover {
+        border-color: #adb5bd;
+        background-color: #e9ecef;
+    }
 }
 
+/* --- 4. Tooltip --- */
 
 .tooltip {
-  position: fixed;
-  z-index: 1000;
-  pointer-events: none;
-  padding: 12px;
-  background: white;
-  border: 1px solid #ddd;
-  border-radius: 8px;
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
-  min-width: 200px;
+    position: fixed;
+    z-index: 1000;
+    pointer-events: none;
+    padding: 16px 20px;
+    background: white;
+    border: 1px solid #e9ecef;
+    border-radius: 12px;
+    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.15);
+    min-width: 240px;
+    animation: tooltipFadeIn 0.2s ease;
 }
 
-.tooltipContent h4 {
-  margin: 0 0 8px 0;
-  font-size: 16px;
-  font-weight: 600;
-  color: #333;
+@keyframes tooltipFadeIn {
+    from {
+        opacity: 0;
+        transform: translate(-50%, calc(-100% - 5px));
+    }
+    to {
+        opacity: 1;
+        transform: translate(-50%, -100%);
+    }
+}
+
+.tooltipContent {
+    h4 {
+        margin: 0 0 12px 0;
+        font-size: 1.1rem;
+        font-weight: 700;
+        color: #1a1a1a;
+        padding-bottom: 10px;
+        border-bottom: 2px solid #e9ecef;
+    }
 }
 
 .tooltipViews {
-  display: flex;
-  flex-direction: column;
-  gap: 4px;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    margin-top: 8px;
 }
 
 .tooltipRow {
-  display: flex;
-  justify-content: space-between;
-  font-size: 14px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    font-size: 0.9rem;
+    padding: 4px 0;
+
+    &:not(:last-child) {
+        border-bottom: 1px solid #f1f3f5;
+    }
 }
 
 .tooltipLabel {
-  color: #666;
-  font-weight: 500;
+    color: #6c757d;
+    font-weight: 600;
+    text-transform: capitalize;
 }
 
 .tooltipValue {
-  color: #333;
-  font-weight: 600;
+    color: #495057;
+    font-weight: 700;
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
 }
 
-.attendeeChip {
-  cursor: pointer;
-  transition: transform 0.2s ease, box-shadow 0.2s ease;
-}
+/* --- 5. Responsive Design --- */
 
-.attendeeChip:hover {
-  transform: translateY(-2px);
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
+@media (max-width: 768px) {
+    .visualizerContainer {
+        padding: 2rem 1.5rem;
+        margin: 1rem auto;
+    }
+
+    .header h2 {
+        font-size: 1.5rem;
+    }
+
+    .seatingLayout {
+        grid-template-columns: 1fr;
+        gap: 1.5rem;
+    }
+
+    .tableContainer {
+        padding: 1.5rem 1rem;
+    }
+
+    .attendeeGrid {
+        gap: 10px;
+    }
+
+    .attendeeChip {
+        min-width: 100px;
+        padding: 10px 14px;
+        font-size: 0.85rem;
+    }
 }

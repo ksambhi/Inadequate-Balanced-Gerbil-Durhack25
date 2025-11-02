@@ -154,9 +154,6 @@ export const SeatingVisualizer: React.FC<Props> = ({ plan, settings }) => {
     <div className={styles.visualizerContainer}>
       <div className={styles.header}>
         <h2>Seating Plan for: {settings.eventName}</h2>
-        <p className={styles.description}>
-          The plan below shows seating based on the algorithm. Attendee colors reflect their views on the currently selected topic (gradient from **{TOPIC_COLOR_PALETTE.find((_, index) => settings.views[index] === selectedView)?.B || 'Color B'}** to **{TOPIC_COLOR_PALETTE.find((_, index) => settings.views[index] === selectedView)?.A || 'Color A'}**).
-        </p>
 
         <div className={styles.viewSelector}>
           <label htmlFor="view-select">Color by View:</label>

@@ -57,21 +57,23 @@ export const EventCreationForm: React.FC<Props> = ({ onSubmit }) => {
         />
       </div>
 
-      <div className={styles.formField}>
-        <label htmlFor="chaos">Chaos Factor: {chaosFactor}</label>
-        <span>Optimized</span>
-        <input
-          id="chaos"
-          type="range"
-          min="1"
-          max="10"
-          value={chaosFactor}
-          onChange={(e) => setChaosFactor(parseInt(e.target.value))}
-          className={styles.slider}
-        />
-        <span>Chaotic</span>
-      </div>
-
+        <div className={styles.formField}>
+          <label htmlFor="chaos">Chaos Factor: {chaosFactor}</label>
+          <div className={styles.sliderContainer}>
+            <span className={styles.sliderLabel}>Optimized</span>
+            <input
+              id="chaos"
+              type="range"
+              min="1"
+              max="10"
+              value={chaosFactor}
+              onChange={(e) => setChaosFactor(parseInt(e.target.value))}
+              className={styles.slider}
+            />
+            <span className={styles.sliderLabel}>Chaotic</span>
+          </div>
+        </div>
+        
       <button type="submit" className={styles.submitButton}>
         Load Attendees & Continue
       </button>
