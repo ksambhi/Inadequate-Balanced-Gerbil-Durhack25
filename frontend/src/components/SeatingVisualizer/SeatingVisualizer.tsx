@@ -2,16 +2,7 @@ import React, { useState } from 'react';
 import type { SeatingPlan, EventSettings, Attendee } from '../../types/data.types';
 import styles from './SeatingVisualizer.module.scss';
 
-// --- PROPS INTERFACE ---
-interface Props {
-  plan: SeatingPlan;
-  settings: EventSettings; // Needed to map view names to view array indices
-}
-
-// --- COLOR UTILITY FUNCTIONS (Place in a utils file for a cleaner project) ---
-
-// Define your color constants using the imported variables
-// src/components/SeatingVisualizer/SeatingVisualizer.tsx
+// --- COLOR PALETTE AND UTILS ---
 
 // --- STATIC COLOR PALETTE (Max 10 Topics) ---
 // Each object contains the two hex colors that define the extremes (A and B)
@@ -106,24 +97,20 @@ const getDynamicBackgroundColor = (viewValue: number, selectedView: string, sett
 };
 
 // --- VIEW VALUE RETRIEVAL ---
-
 /**
- * Maps the selected view name to the correct numeric value in the AttendeeViews array.
+ * For a given attendee and selected view, get the numeric value from opinions.views by index.
+ * If not found, return 0.5 (neutral).
  */
 const getCurrentViewValue = (attendee: Attendee, selectedView: string, settings: EventSettings): number => {
-    const viewIndex = settings.views.indexOf(selectedView);
-    
-    if (viewIndex === -1 || !attendee.opinions.views[viewIndex]) {
-        // Fallback to neutral if view not found or index is out of bounds
-        return 0.5; 
-    }
-    
-    return attendee.opinions.views[viewIndex]; 
+  const viewIndex = settings.views.indexOf(selectedView);
+  if (viewIndex === -1 || !attendee.opinions.views[viewIndex]) {
+    return 0.5;
+  }
+  return Math.max(0, Math.min(1, attendee.opinions.views[viewIndex]));
 };
 
-
-export const SeatingVisualizer: React.FC<Props> = ({ plan, settings }) => {
-  const [selectedView, setSelectedView] = useState(settings.views[0] || 'chocolate');
+export const SeatingVisualizer: React.FC<{ plan: SeatingPlan; settings: EventSettings }> = ({ plan, settings }) => {
+  const [selectedView, setSelectedView] = useState(settings.views[0] || '');
   const [tooltip, setTooltip] = useState<{
     visible: boolean;
     x: number;
@@ -154,7 +141,6 @@ export const SeatingVisualizer: React.FC<Props> = ({ plan, settings }) => {
     <div className={styles.visualizerContainer}>
       <div className={styles.header}>
         <h2>Seating Plan for: {settings.eventName}</h2>
-
         <div className={styles.viewSelector}>
           <label htmlFor="view-select">Color by View:</label>
           <select
@@ -170,43 +156,60 @@ export const SeatingVisualizer: React.FC<Props> = ({ plan, settings }) => {
           </select>
         </div>
       </div>
-
       <div className={styles.seatingLayout}>
-        {plan.tables.map((table) => (
-          <div key={table.id} className={styles.tableContainer}>
-            <div className={styles.table}>
-              Table {table.id} ({table.attendees.length} / {table.capacity} Seats)
-            </div>
-            
-            <div className={styles.attendeeGrid}>
-              {table.attendees.map((attendee) => {
-                  const viewValue = getCurrentViewValue(attendee, selectedView, settings);
-                  const dynamicColor = getDynamicBackgroundColor(viewValue, selectedView, settings);
-                  
-                  return (
-                      <div 
-                          key={attendee.id} 
-                          className={styles.attendeeChip}
-                          style={{ backgroundColor: dynamicColor }}
-                          onMouseEnter={(e) => handleMouseEnter(e, attendee)}
-                          onMouseLeave={handleMouseLeave}
-                      >
-                          {attendee.name} 
-                          <span className={styles.scoreText}>({(viewValue * 100).toFixed(0)}%)</span>
-                      </div>
-                  );
-              })}
-              
-              {Array(table.capacity - table.attendees.length).fill(0).map((_, index) => (
-                <div key={`empty-${table.id}-${index}`} className={styles.emptySeat}>
-                    (Empty)
+        {/* Instead of plan.tables, flatten all attendees and group by table_no */}
+        {(() => {
+          // Group attendees by table_no
+          const tableMap: { [tableId: number]: Attendee[] } = {};
+          plan.tables.forEach((table) => {
+            tableMap[table.id] = [];
+          });
+          plan.tables.forEach((table) => {
+            table.attendees.forEach((attendee) => {
+              if (typeof attendee.table_no === 'number') {
+                if (!tableMap[attendee.table_no]) tableMap[attendee.table_no] = [];
+                tableMap[attendee.table_no].push(attendee);
+              }
+            });
+          });
+          // Render tables by table_no
+          return Object.entries(tableMap).map(([tableId, attendees]) => {
+            const table = plan.tables.find(t => t.id === Number(tableId));
+            return (
+              <div key={tableId} className={styles.tableContainer}>
+                <div className={styles.table}>
+                  Table {tableId} ({attendees.length} / {table?.capacity ?? 0} Seats)
                 </div>
-              ))}
-            </div>
-          </div>
-        ))}
+                <div className={styles.attendeeGrid}>
+                  {/* Sort attendees by seat_no */}
+                  {attendees.sort((a, b) => (a.seat_no ?? 0) - (b.seat_no ?? 0)).map((attendee) => {
+                    const viewValue = getCurrentViewValue(attendee, selectedView, settings);
+                    const dynamicColor = getDynamicBackgroundColor(viewValue, selectedView, settings);
+                    return (
+                      <div
+                        key={attendee.id}
+                        className={styles.attendeeChip}
+                        style={{ backgroundColor: dynamicColor }}
+                        onMouseEnter={(e) => handleMouseEnter(e, attendee)}
+                        onMouseLeave={handleMouseLeave}
+                      >
+                        {attendee.name} <span className={styles.scoreText}>({(viewValue * 100).toFixed(0)}%)</span>
+                        <span className={styles.seatText}>Seat {attendee.seat_no ?? '-'}</span>
+                      </div>
+                    );
+                  })}
+                  {/* Empty seats */}
+                  {Array((table?.capacity ?? 0) - attendees.length).fill(0).map((_, index) => (
+                    <div key={`empty-${tableId}-${index}`} className={styles.emptySeat}>
+                      (Empty)
+                    </div>
+                  ))}
+                </div>
+              </div>
+            );
+          });
+        })()}
       </div>
-
       {/* Tooltip */}
       {tooltip.visible && tooltip.attendee && (
         <div

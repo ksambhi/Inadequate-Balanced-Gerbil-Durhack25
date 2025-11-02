@@ -15,6 +15,8 @@ export interface Attendee {
   phone: string;
   email: string;
   opinions: AttendeeViews;
+  table_no?: number;
+  seat_no?: number;
 }
 
 // The settings from the first page

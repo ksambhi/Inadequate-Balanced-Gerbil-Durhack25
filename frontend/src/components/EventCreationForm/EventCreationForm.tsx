@@ -11,7 +11,20 @@ export const EventCreationForm: React.FC<Props> = ({ onSubmit }) => {
   const [numberOfTables, setNumberOfTables] = useState(10);
   const [tableSize, setTableSize] = useState(8);
   const [chaosFactor, setChaosFactor] = useState(5);
-  const [views, setViews] = useState(['chocolate', 'age']);
+  const [views, setViews] = useState<string[]>(['chocolate', 'age']);
+  const [newView, setNewView] = useState('');
+
+  const handleAddView = () => {
+    if (newView.trim() && !views.includes(newView.trim())) {
+      setViews([...views, newView.trim()]);
+      setNewView('');
+    }
+  };
+
+  const handleRemoveView = (index: number) => {
+    setViews(views.filter((_, i) => i !== index));
+  };
+
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     onSubmit({
@@ -73,7 +86,28 @@ export const EventCreationForm: React.FC<Props> = ({ onSubmit }) => {
             <span className={styles.sliderLabel}>Chaotic</span>
           </div>
         </div>
-        
+
+      <div className={styles.formField}>
+        <label htmlFor="views">Opinion Questions (Topics)</label>
+        <div className={styles.viewsList}>
+          {views.map((view, idx) => (
+            <div key={view} className={styles.viewItem}>
+              {view}
+              <button type="button" onClick={() => handleRemoveView(idx)} className={styles.removeViewBtn}>✕</button>
+            </div>
+          ))}
+        </div>
+        <div className={styles.addViewContainer}>
+          <input
+            type="text"
+            placeholder="Add a topic/question"
+            value={newView}
+            onChange={(e) => setNewView(e.target.value)}
+          />
+          <button type="button" onClick={handleAddView} className={styles.addViewBtn}>Add</button>
+        </div>
+      </div>
+
       <button type="submit" className={styles.submitButton}>
         Load Attendees & Continue
       </button>

@@ -117,7 +117,7 @@ export const AttendeeManager: React.FC<Props> = ({ onSetAttendees, onGeneratePla
     pollingIntervalRef.current = window.setInterval(() => {
       pollCount++;
       pollRsvpStatus(attendeeIds);
-      if (pollCount >= 30) {
+      if (pollCount >= 5) {
         console.log('Max 30 RSVP polls reached, marking all as RSVP\'d and stopping.');
         markAllAsRsvped(attendeeIds);
       }

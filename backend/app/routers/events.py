@@ -280,6 +280,8 @@ async def call_attendees(event_id: int, db: AsyncSession = Depends(get_db)):
     attendees = result.scalars().all()
     call_results = []
     for attendee in attendees:
+        if not attendee.phone:
+            continue  # Skip if no phone number
         call_response = make_elevenlabs_call(attendee.phone, user=attendee.name, event_id=event_id, user_id=attendee.id)
         call_results.append({"id": attendee.id, "phone": attendee.phone, "result": call_response})
     return {"calls": call_results}
