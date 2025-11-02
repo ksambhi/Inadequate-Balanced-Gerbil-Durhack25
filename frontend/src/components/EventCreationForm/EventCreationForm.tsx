@@ -38,7 +38,7 @@ export const EventCreationForm: React.FC<Props> = ({ onSubmit }) => {
           total_tables: numberOfTables,
           ppl_per_table: tableSize,
           chaos_temp: chaosFactor,
-          views
+          opinions: views
         })
       });
       if (!response.ok) throw new Error('Failed to create event');
