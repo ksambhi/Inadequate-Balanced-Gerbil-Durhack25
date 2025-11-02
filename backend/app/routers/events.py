@@ -1,3 +1,4 @@
+from sympy import true
 from fastapi import APIRouter, Depends, HTTPException, BackgroundTasks
 from pydantic import BaseModel
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -222,7 +223,9 @@ async def add_attendees(
             email=attendee_data.email,
             event_id=event_id,
             table_no=None,
-            seat_no=None
+            seat_no=None,
+            rsvp=True,
+            going=True,
         )
         db.add(attendee)
         created_attendees.append(attendee)
