@@ -4,10 +4,11 @@ import styles from './AttendeeManager.module.scss';
 import { MOCK_ATTENDEES } from '../../hooks/useSeatingAlgorithm'; 
 
 interface Props {
+  onSetAttendees: (attendees: Attendee[]) => void;
   onGeneratePlan: (finalAttendees: Attendee[]) => void;
 }
 
-export const AttendeeManager: React.FC<Props> = ({ onGeneratePlan }) => {
+export const AttendeeManager: React.FC<Props> = ({ onSetAttendees, onGeneratePlan }) => {
   // New state to manage an array of raw attendee objects (Name & Phone)
   const [rawAttendees, setRawAttendees] = useState<RawAttendee[]>([
     { id: '1', name: '', phoneNumber: '' } // Start with one empty row
@@ -53,6 +54,8 @@ export const AttendeeManager: React.FC<Props> = ({ onGeneratePlan }) => {
     }));
 
     setAttendeesWithViews(finalData);
+    // Call the parent's onSetAttendees to handle the PUT request
+    onSetAttendees(finalData);
   };
 
   const totalInvited = rawAttendees.filter(a => a.name.trim() !== '').length;

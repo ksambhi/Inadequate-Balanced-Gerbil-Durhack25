@@ -56,9 +56,8 @@ function App() {
       });
   };
 
-  // 2. Called by AttendeeManager when data is ready
-  const handleGeneratePlan = (finalAttendees: Attendee[]) => {
-    // Add attendees
+  // 2. Called by AttendeeManager when invites are sent
+  const handleSetAttendees = (finalAttendees: Attendee[]) => {
     // PUT /{event_id}/attendees/
     if (!eventId) {
       console.error("Event ID is null. Cannot add attendees.");
@@ -66,7 +65,7 @@ function App() {
     }
 
     axios
-      .put(`${BASE_URL}/events/${eventId}/attendees/`, {
+      .put(`${BASE_URL}/events/${eventId}/attendees`, {
         attendees: finalAttendees.map((a) => ({
           name: a.name,
           phone: a.phone,
@@ -79,6 +78,10 @@ function App() {
       .catch((error) => {
         console.error("Error adding attendees:", error);
       });
+  };
+
+  // 3. Called by AttendeeManager when ready to generate seating plan
+  const handleGeneratePlan = (finalAttendees: Attendee[]) => {
 
     // --- MOCK SEATING PLAN GENERATION ---
     // Use the stored settings for more realistic mock tables
@@ -116,7 +119,10 @@ function App() {
       )}
 
       {step === "MANAGE_ATTENDEES" && (
-        <AttendeeManager onGeneratePlan={handleGeneratePlan} />
+        <AttendeeManager 
+          onSetAttendees={handleSetAttendees}
+          onGeneratePlan={handleGeneratePlan} 
+        />
       )}
       {/* 2. Pass 'settings' to SeatingVisualizer, which now requires it */}
       {step === "VIEW_PLAN" && seatingPlan && settings && (
