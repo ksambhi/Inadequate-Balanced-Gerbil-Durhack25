@@ -1,6 +1,7 @@
-import React, { useState } from 'react';
-import type { SeatingPlan, EventSettings, Attendee } from '../../types/data.types';
+import React, { useState, useEffect } from 'react';
+import type { SeatingPlan, EventSettings, Attendee, SeatingTable } from '../../types/data.types';
 import styles from './SeatingVisualizer.module.scss';
+import { BASE_URL } from "../../utils/constants";
 
 // --- COLOR PALETTE AND UTILS ---
 
@@ -109,8 +110,64 @@ const getCurrentViewValue = (attendee: Attendee, selectedView: string, settings:
   return Math.max(0, Math.min(1, attendee.opinions.views[viewIndex]));
 };
 
+// Transform API response to SeatingPlan structure
+const transformToSeatingPlan = (
+  apiAttendees: Array<{
+    id: number;
+    name: string;
+    phone: string;
+    email: string;
+    table_no: number | null;
+    seat_no: number | null;
+    opinions: Array<{ question: string; answer: number }>;
+  }>,
+  settings: EventSettings
+): SeatingPlan => {
+  // Create empty tables
+  const tables: SeatingTable[] = [];
+  for (let i = 0; i < settings.numberOfTables; i++) {
+    tables.push({
+      id: i,
+      capacity: settings.tableSize,
+      attendees: []
+    });
+  }
+
+  // Process each attendee from API
+  apiAttendees.forEach((apiAttendee) => {
+    // Skip if no table assignment yet (null table_no)
+    if (apiAttendee.table_no === null || apiAttendee.table_no === undefined) {
+      return;
+    }
+
+    // Transform opinions array to views array (normalize to 0-1 range)
+    const views = apiAttendee.opinions.map((op) => {
+      // Assuming answer is 0-10, normalize to 0-1
+      return op.answer / 10;
+    });
+
+    const attendee: Attendee = {
+      id: apiAttendee.id.toString(),
+      name: apiAttendee.name,
+      phone: apiAttendee.phone,
+      email: apiAttendee.email,
+      opinions: { views },
+      table_no: apiAttendee.table_no,
+      seat_no: apiAttendee.seat_no ?? undefined
+    };
+
+    // Add to appropriate table
+    if (apiAttendee.table_no >= 0 && apiAttendee.table_no < tables.length) {
+      tables[apiAttendee.table_no].attendees.push(attendee);
+    }
+  });
+
+  return { tables };
+};
+
 export const SeatingVisualizer: React.FC<{ plan: SeatingPlan; settings: EventSettings }> = ({ plan, settings }) => {
   const [selectedView, setSelectedView] = useState(settings.views[0] || '');
+  const [seatingPlan, setSeatingPlan] = useState<SeatingPlan>(plan);
   const [tooltip, setTooltip] = useState<{
     visible: boolean;
     x: number;
@@ -122,6 +179,35 @@ export const SeatingVisualizer: React.FC<{ plan: SeatingPlan; settings: EventSet
     y: 0,
     attendee: null
   });
+
+  // Fetch attendees from API and transform to SeatingPlan
+  useEffect(() => {
+    const fetchAttendees = async () => {
+      if (!settings.eventId) return;
+
+      try {
+        const response = await fetch(`${BASE_URL}/events/${settings.eventId}/attendees`);
+        if (!response.ok) return;
+
+        const attendees = await response.json();
+        
+        // Transform API response to SeatingPlan
+        const transformedPlan = transformToSeatingPlan(attendees, settings);
+        setSeatingPlan(transformedPlan);
+      } catch (error) {
+        console.error('Error fetching attendees:', error);
+      }
+    };
+
+    // Initial fetch
+    fetchAttendees();
+
+    // Set up polling interval (1 second)
+    const interval = setInterval(fetchAttendees, 1000);
+
+    // Cleanup on unmount
+    return () => clearInterval(interval);
+  }, [settings]);
 
   const handleMouseEnter = (e: React.MouseEvent, attendee: Attendee) => {
     const rect = e.currentTarget.getBoundingClientRect();
@@ -161,10 +247,10 @@ export const SeatingVisualizer: React.FC<{ plan: SeatingPlan; settings: EventSet
         {(() => {
           // Group attendees by table_no
           const tableMap: { [tableId: number]: Attendee[] } = {};
-          plan.tables.forEach((table) => {
+          seatingPlan.tables.forEach((table) => {
             tableMap[table.id] = [];
           });
-          plan.tables.forEach((table) => {
+          seatingPlan.tables.forEach((table) => {
             table.attendees.forEach((attendee) => {
               if (typeof attendee.table_no === 'number') {
                 if (!tableMap[attendee.table_no]) tableMap[attendee.table_no] = [];
@@ -174,7 +260,7 @@ export const SeatingVisualizer: React.FC<{ plan: SeatingPlan; settings: EventSet
           });
           // Render tables by table_no
           return Object.entries(tableMap).map(([tableId, attendees]) => {
-            const table = plan.tables.find(t => t.id === Number(tableId));
+            const table = seatingPlan.tables.find(t => t.id === Number(tableId));
             return (
               <div key={tableId} className={styles.tableContainer}>
                 <div className={styles.table}>

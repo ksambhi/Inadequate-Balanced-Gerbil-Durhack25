@@ -69,34 +69,36 @@ function App() {
   };
 
   // 3. Called by AttendeeManager when ready to generate seating plan
-  const handleGeneratePlan = (finalAttendees: Attendee[]) => {
-
-    // --- MOCK SEATING PLAN GENERATION ---
-    // Use the stored settings for more realistic mock tables
-    const tableCapacity = settings.tableSize;
-    const mockTables = [];
-    let attendeeIndex = 0;
-
-    for (let i = 0; i < settings.numberOfTables; i++) {
-      const attendeesForTable = finalAttendees.slice(
-        attendeeIndex,
-        attendeeIndex + tableCapacity
-      );
-      mockTables.push({
-        id: i + 1,
-        capacity: tableCapacity,
-        attendees: attendeesForTable,
-      });
-      attendeeIndex += tableCapacity;
+  const handleGeneratePlan = async () => {
+    if (!eventId) {
+      console.error("No event ID available");
+      return;
     }
 
-    const mockPlan: SeatingPlan = {
-      tables: mockTables.filter((t) => t.attendees.length > 0), // Remove empty tables
-    };
-    // ------------------------------------
+    try {
+      // Make request to backend to allocate seats
+      const response = await axios.post(
+        `${BASE_URL}/events/${eventId}/allocate_seats`,
+        null, // No body needed
+        {
+          params: { verbose: false }
+        }
+      );
 
-    setSeatingPlan(mockPlan);
-    setStep("VIEW_PLAN");
+      console.log("Seating allocation successful:", response.data);
+      
+      // The seating plan will be fetched automatically by SeatingVisualizer
+      // Just set a placeholder plan to trigger the VIEW_PLAN step
+      const placeholderPlan: SeatingPlan = {
+        tables: []
+      };
+      
+      setSeatingPlan(placeholderPlan);
+      setStep("VIEW_PLAN");
+    } catch (error) {
+      console.error("Error allocating seats:", error);
+      // You might want to show an error message to the user here
+    }
   };
 
   // Render the correct component based on the current step
