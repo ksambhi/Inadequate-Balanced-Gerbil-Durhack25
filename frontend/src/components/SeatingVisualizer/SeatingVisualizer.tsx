@@ -202,8 +202,8 @@ export const SeatingVisualizer: React.FC<{ plan: SeatingPlan; settings: EventSet
     // Initial fetch
     fetchAttendees();
 
-    // Set up polling interval (1 second)
-    const interval = setInterval(fetchAttendees, 1000);
+    // Set up polling interval (5 seconds)
+    const interval = setInterval(fetchAttendees, 5000);
 
     // Cleanup on unmount
     return () => clearInterval(interval);
