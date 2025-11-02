@@ -22,6 +22,7 @@ export interface Attendee {
 // The settings from the first page
 export interface EventSettings {
   eventName: string;
+  eventId?: string;
   numberOfTables: number;
   tableSize: number;
   chaosFactor: number;

@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import type { EventSettings } from '../../types/data.types';
+import { BASE_URL } from '../../utils/constants';
 import styles from './EventCreationForm.module.scss';
 
 interface Props {
@@ -25,15 +26,35 @@ export const EventCreationForm: React.FC<Props> = ({ onSubmit }) => {
     setViews(views.filter((_, i) => i !== index));
   };
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    onSubmit({
-      eventName,
-      numberOfTables,
-      tableSize,
-      chaosFactor,
-      views
-    });
+    // Save event to backend
+    try {
+      const response = await fetch(`${BASE_URL}/events/create`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          name: eventName,
+          total_tables: numberOfTables,
+          ppl_per_table: tableSize,
+          chaos_temp: chaosFactor,
+          views
+        })
+      });
+      if (!response.ok) throw new Error('Failed to create event');
+      const eventData = await response.json();
+      // Pass event data to parent
+      onSubmit({
+        eventName,
+        numberOfTables,
+        tableSize,
+        chaosFactor,
+        views,
+        eventId: eventData.id // If you want to pass the event id
+      });
+    } catch (err) {
+      alert('Error creating event');
+    }
   };
 
   return (
