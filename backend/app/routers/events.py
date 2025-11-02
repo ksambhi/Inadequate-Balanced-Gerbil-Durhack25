@@ -53,6 +53,7 @@ class AttendeeResponse(BaseModel):
     seat_no: int | None
     event_id: int
     opinions: list[OpinionAnswer]
+    rsvp_status: bool | None = None
     
     class Config:
         from_attributes = True
@@ -135,7 +136,8 @@ async def get_attendees(
             table_no=attendee.table_no,
             seat_no=attendee.seat_no,
             event_id=attendee.event_id,
-            opinions=opinion_answers
+            opinions=opinion_answers,
+            rsvp_status=attendee.rsvp
         ))
     
     return response

@@ -121,7 +121,8 @@ function App() {
       {step === "MANAGE_ATTENDEES" && (
         <AttendeeManager 
           onSetAttendees={handleSetAttendees}
-          onGeneratePlan={handleGeneratePlan} 
+          onGeneratePlan={handleGeneratePlan}
+          eventId={eventId}
         />
       )}
       {/* 2. Pass 'settings' to SeatingVisualizer, which now requires it */}
