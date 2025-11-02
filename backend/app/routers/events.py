@@ -1,15 +1,19 @@
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, BackgroundTasks
 from pydantic import BaseModel
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, func
 from sqlalchemy.orm import selectinload
 import os
 import httpx
+import logging
 
 from app.database import get_db
-from app.models import Event, EventAttendee, JoinedOpinion, Opinion
+from app.models import Event, EventAttendee, JoinedOpinion, Opinion, Fact
+from app.matching_agent import MatchingAgent, MatchResult
+from app.matcher_runner import MatcherRunner
 
 router = APIRouter(prefix="/api/events", tags=["events"])
+logger = logging.getLogger(__name__)
 
 
 class EventCreate(BaseModel):
@@ -285,3 +289,234 @@ async def call_attendees(event_id: int, db: AsyncSession = Depends(get_db)):
         call_response = make_elevenlabs_call(attendee.phone, user=attendee.name, event_id=event_id, user_id=attendee.id)
         call_results.append({"id": attendee.id, "phone": attendee.phone, "result": call_response})
     return {"calls": call_results}
+
+
+@router.post("/{event_id}/find_match/{attendee_id}", response_model=dict)
+async def find_seat_match(
+    event_id: int,
+    attendee_id: int,
+    db: AsyncSession = Depends(get_db)
+):
+    """
+    Use AI agent to find the best seat match for an attendee.
+    Uses the event's chaos_temp as the chaos level.
+    """
+    # Check if event exists
+    event_result = await db.execute(
+        select(Event).where(Event.id == event_id)
+    )
+    event = event_result.scalar_one_or_none()
+    
+    if not event:
+        raise HTTPException(status_code=404, detail="Event not found")
+    
+    # Check if attendee exists and belongs to this event
+    attendee_result = await db.execute(
+        select(EventAttendee)
+        .where(EventAttendee.id == attendee_id)
+        .where(EventAttendee.event_id == event_id)
+        .options(selectinload(EventAttendee.facts))
+        .options(selectinload(EventAttendee.opinions))
+    )
+    attendee = attendee_result.scalar_one_or_none()
+    
+    if not attendee:
+        raise HTTPException(
+            status_code=404,
+            detail="Attendee not found or doesn't belong to this event"
+        )
+    
+    # Gather facts
+    facts = [fact.fact for fact in attendee.facts]
+    
+    # Gather opinions with questions
+    opinions = []
+    for joined_opinion in attendee.opinions:
+        opinion_result = await db.execute(
+            select(Opinion).where(
+                Opinion.opinion_id == joined_opinion.opinion_id
+            )
+        )
+        opinion = opinion_result.scalar_one_or_none()
+        if opinion:
+            opinions.append({
+                "question": opinion.opinion,
+                "answer": joined_opinion.answer
+            })
+    
+    # Initialize the matching agent
+    agent = MatchingAgent()
+    
+    # Find the best match using the event's chaos_temp
+    match_result = await agent.find_match(
+        attendee_id=attendee_id,
+        facts=facts,
+        opinions=opinions,
+        chaos_level=event.chaos_temp
+    )
+    
+    # Return the result
+    return {
+        "attendee_id": attendee_id,
+        "matched_with": match_result.attendee_id,
+        "reasoning": match_result.reasoning,
+        "confidence": match_result.confidence,
+        "chaos_level": event.chaos_temp
+    }
+
+
+@router.post("/{event_id}/allocate_seats", response_model=dict)
+async def allocate_seats(
+    event_id: int,
+    verbose: bool = False,
+    db: AsyncSession = Depends(get_db)
+):
+    """
+    Run the matcher runner to allocate seats for all attendees.
+    
+    This endpoint:
+    1. Fetches all attendees for the event
+    2. Matches them into pairs using the AI agent
+    3. Allocates seats sequentially (table 0 seat 0, 0 seat 1, etc.)
+    4. Updates the database with seat assignments
+    
+    Args:
+        event_id: ID of the event
+        verbose: Enable verbose logging (default: False)
+        db: Database session
+        
+    Returns:
+        Dict with allocation results
+    """
+    runner = MatcherRunner(verbose=verbose)
+    result = await runner.run(event_id=event_id)
+    
+    if not result.get("success"):
+        raise HTTPException(
+            status_code=400,
+            detail=result.get("error", "Unknown error occurred")
+        )
+    
+    return result
+
+
+async def run_matcher_background(event_id: int):
+    """
+    Background task to run the matcher for an event.
+    
+    This function runs the complete matching process:
+    1. Fetches all attendees for the event
+    2. Matches them into pairs using the AI agent
+    3. Allocates seats sequentially
+    4. Updates the database with seat assignments
+    
+    Logs progress similar to the create_and_run_event.py script.
+    
+    Args:
+        event_id: ID of the event to process
+    """
+    logger.info("="*60)
+    logger.info(f"STARTING BACKGROUND MATCHER FOR EVENT {event_id}")
+    logger.info("="*60)
+    
+    try:
+        # Run matcher with verbose logging
+        runner = MatcherRunner(verbose=True)
+        result = await runner.run(event_id=event_id)
+        
+        if result.get("success"):
+            logger.info("\n" + "="*60)
+            logger.info("MATCHING COMPLETE")
+            logger.info("="*60)
+            logger.info(f"Event: {result['event_name']} (ID: {event_id})")
+            logger.info(f"Attendees: {result['attendees_count']}")
+            logger.info(f"Pairs created: {result['pairs_created']}")
+            logger.info(f"People seated: {result['attendees_seated']}")
+            if result['attendees_unallocated'] > 0:
+                logger.info(
+                    f"Unallocated: {result['attendees_unallocated']}"
+                )
+            logger.info("="*60)
+        else:
+            logger.error("\n" + "="*60)
+            logger.error("MATCHING FAILED")
+            logger.error("="*60)
+            logger.error(f"Event ID: {event_id}")
+            logger.error(f"Error: {result.get('error')}")
+            logger.error("="*60)
+            
+    except Exception as e:
+        logger.error("\n" + "="*60)
+        logger.error("MATCHING ERROR")
+        logger.error("="*60)
+        logger.error(f"Event ID: {event_id}")
+        logger.error(f"Exception: {e}", exc_info=True)
+        logger.error("="*60)
+
+
+@router.post(
+    "/{event_id}/start_matching",
+    status_code=202,
+    response_model=dict
+)
+async def start_matching_background(
+    event_id: int,
+    background_tasks: BackgroundTasks,
+    db: AsyncSession = Depends(get_db)
+):
+    """
+    Start the matcher runner in the background for an event.
+    
+    Returns immediately with 202 Accepted while the matching process
+    runs in the background. Check logs for progress and results.
+    
+    This endpoint:
+    1. Validates the event exists
+    2. Starts the matching process in the background
+    3. Returns 202 Accepted immediately
+    
+    The background process will:
+    - Fetch all attendees for the event
+    - Match them into pairs using the AI agent
+    - Allocate seats sequentially
+    - Update the database with seat assignments
+    - Log progress and results
+    
+    Args:
+        event_id: ID of the event
+        background_tasks: FastAPI background tasks handler
+        db: Database session
+        
+    Returns:
+        Dict with status and message
+        
+    Raises:
+        HTTPException: 404 if event not found
+    """
+    # Validate event exists
+    query = select(Event).where(Event.id == event_id)
+    result = await db.execute(query)
+    event = result.scalar_one_or_none()
+    
+    if not event:
+        raise HTTPException(
+            status_code=404,
+            detail=f"Event with id {event_id} not found"
+        )
+    
+    # Start background task
+    background_tasks.add_task(run_matcher_background, event_id)
+    
+    logger.info(
+        f"Started background matching for event {event_id} ({event.name})"
+    )
+    
+    return {
+        "status": "accepted",
+        "message": (
+            f"Matching process started for event {event_id}. "
+            "Check logs for progress."
+        ),
+        "event_id": event_id,
+        "event_name": event.name
+    }
