@@ -105,3 +105,52 @@ body {
     justify-content: center;
     align-items: center;
 }
+
+/* Loading Overlay */
+.loading-overlay {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100vw;
+    height: 100vh;
+    background: rgba(0, 0, 0, 0.85);
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    z-index: 9999;
+    backdrop-filter: blur(8px);
+}
+
+.loading-content {
+    text-align: center;
+    color: white;
+    
+    h2 {
+        font-size: 2rem;
+        margin: 1.5rem 0 0.5rem;
+        font-weight: 600;
+    }
+    
+    p {
+        font-size: 1.1rem;
+        opacity: 0.8;
+        margin: 0.5rem 0;
+    }
+}
+
+/* Spinner Animation */
+.spinner {
+    width: 80px;
+    height: 80px;
+    border: 8px solid rgba(255, 255, 255, 0.2);
+    border-top-color: #667eea;
+    border-radius: 50%;
+    animation: spin 1s linear infinite;
+    margin: 0 auto;
+}
+
+@keyframes spin {
+    to {
+        transform: rotate(360deg);
+    }
+}

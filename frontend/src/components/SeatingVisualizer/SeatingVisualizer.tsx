@@ -140,18 +140,25 @@ export const SeatingVisualizer: React.FC<{ plan: SeatingPlan; settings: EventSet
       });
     });
 
-    // Assign attendees to tables sequentially
+    // Shuffle attendees randomly (Fisher-Yates shuffle)
+    const shuffledAttendees = [...allAttendees];
+    for (let i = shuffledAttendees.length - 1; i > 0; i--) {
+      const j = Math.floor(Math.random() * (i + 1));
+      [shuffledAttendees[i], shuffledAttendees[j]] = [shuffledAttendees[j], shuffledAttendees[i]];
+    }
+
+    // Assign shuffled attendees to tables randomly
     let currentTableIndex = 0;
     let seatCounter = 1;
     
-    allAttendees.forEach((attendee) => {
+    shuffledAttendees.forEach((attendee) => {
       const currentTable = plan.tables[currentTableIndex];
       
       // Generate random opinion values (0 to 1) for each view
       // Value r means: r * colorA + (1-r) * colorB
       const randomViews = settings.views.map(() => Math.random());
       
-      // Create modified attendee with sequential seat assignment and random binary opinions
+      // Create modified attendee with random seat assignment and random opinions
       const modifiedAttendee: Attendee = {
         ...attendee,
         table_no: currentTable.id,

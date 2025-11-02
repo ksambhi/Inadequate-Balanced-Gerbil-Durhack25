@@ -31,6 +31,7 @@ function App() {
 
   // Attendee state is no longer fully needed here as AttendeeManager now handles mock loading
   const [seatingPlan, setSeatingPlan] = useState<SeatingPlan | null>(null);
+  const [isGeneratingPlan, setIsGeneratingPlan] = useState(false);
 
   // event id
   const [eventId, setEventId] = useState<string | null>(null);
@@ -69,7 +70,11 @@ function App() {
   };
 
   // 3. Called by AttendeeManager when ready to generate seating plan
-  const handleGeneratePlan = (finalAttendees: Attendee[]) => {
+  const handleGeneratePlan = async (finalAttendees: Attendee[]) => {
+    setIsGeneratingPlan(true);
+
+    // Simulate AI processing with 10-second delay
+    await new Promise(resolve => setTimeout(resolve, 10000));
 
     // --- MOCK SEATING PLAN GENERATION ---
     // Use the stored settings for more realistic mock tables
@@ -96,6 +101,7 @@ function App() {
     // ------------------------------------
 
     setSeatingPlan(mockPlan);
+    setIsGeneratingPlan(false);
     setStep("VIEW_PLAN");
   };
 
@@ -107,11 +113,22 @@ function App() {
       )}
 
       {step === "MANAGE_ATTENDEES" && (
-        <AttendeeManager 
-          onSetAttendees={handleSetAttendees}
-          onGeneratePlan={handleGeneratePlan}
-          eventId={eventId}
-        />
+        <>
+          <AttendeeManager 
+            onSetAttendees={handleSetAttendees}
+            onGeneratePlan={handleGeneratePlan}
+            eventId={eventId}
+          />
+          {isGeneratingPlan && (
+            <div className="loading-overlay">
+              <div className="loading-content">
+                <div className="spinner"></div>
+                <h2>Generating Seating Plan...</h2>
+                <p>Analyzing attendee preferences and optimizing seating arrangements</p>
+              </div>
+            </div>
+          )}
+        </>
       )}
       {/* 2. Pass 'settings' to SeatingVisualizer, which now requires it */}
       {step === "VIEW_PLAN" && seatingPlan && settings && (
