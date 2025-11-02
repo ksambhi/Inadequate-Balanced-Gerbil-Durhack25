@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
 import type { SeatingPlan, EventSettings, Attendee } from '../../types/data.types';
 import styles from './SeatingVisualizer.module.scss';
 
@@ -123,6 +123,62 @@ export const SeatingVisualizer: React.FC<{ plan: SeatingPlan; settings: EventSet
     attendee: null
   });
 
+  // Generate sequential seat assignments and random binary opinions (0 or 1)
+  const processedPlan = useMemo(() => {
+    const tableMap: { [tableId: number]: Attendee[] } = {};
+    
+    // Initialize table map
+    plan.tables.forEach((table) => {
+      tableMap[table.id] = [];
+    });
+
+    // Collect all attendees from database
+    const allAttendees: Attendee[] = [];
+    plan.tables.forEach((table) => {
+      table.attendees.forEach((attendee) => {
+        allAttendees.push(attendee);
+      });
+    });
+
+    // Assign attendees to tables sequentially
+    let currentTableIndex = 0;
+    let seatCounter = 1;
+    
+    allAttendees.forEach((attendee) => {
+      const currentTable = plan.tables[currentTableIndex];
+      
+      // Generate random opinion values (0 to 1) for each view
+      // Value r means: r * colorA + (1-r) * colorB
+      const randomViews = settings.views.map(() => Math.random());
+      
+      // Create modified attendee with sequential seat assignment and random binary opinions
+      const modifiedAttendee: Attendee = {
+        ...attendee,
+        table_no: currentTable.id,
+        seat_no: seatCounter,
+        opinions: {
+          ...attendee.opinions,
+          views: randomViews
+        }
+      };
+      
+      tableMap[currentTable.id].push(modifiedAttendee);
+      
+      // Move to next seat/table
+      seatCounter++;
+      if (seatCounter > currentTable.capacity) {
+        currentTableIndex++;
+        seatCounter = 1;
+        // Safety check to prevent index out of bounds
+        if (currentTableIndex >= plan.tables.length) {
+          return;
+        }
+      }
+    });
+
+    return tableMap;
+  }, [plan, settings.views]);
+
   const handleMouseEnter = (e: React.MouseEvent, attendee: Attendee) => {
     const rect = e.currentTarget.getBoundingClientRect();
     setTooltip({
@@ -157,58 +213,41 @@ export const SeatingVisualizer: React.FC<{ plan: SeatingPlan; settings: EventSet
         </div>
       </div>
       <div className={styles.seatingLayout}>
-        {/* Instead of plan.tables, flatten all attendees and group by table_no */}
-        {(() => {
-          // Group attendees by table_no
-          const tableMap: { [tableId: number]: Attendee[] } = {};
-          plan.tables.forEach((table) => {
-            tableMap[table.id] = [];
-          });
-          plan.tables.forEach((table) => {
-            table.attendees.forEach((attendee) => {
-              if (typeof attendee.table_no === 'number') {
-                if (!tableMap[attendee.table_no]) tableMap[attendee.table_no] = [];
-                tableMap[attendee.table_no].push(attendee);
-              }
-            });
-          });
-          // Render tables by table_no
-          return Object.entries(tableMap).map(([tableId, attendees]) => {
-            const table = plan.tables.find(t => t.id === Number(tableId));
-            return (
-              <div key={tableId} className={styles.tableContainer}>
-                <div className={styles.table}>
-                  Table {tableId} ({attendees.length} / {table?.capacity ?? 0} Seats)
-                </div>
-                <div className={styles.attendeeGrid}>
-                  {/* Sort attendees by seat_no */}
-                  {attendees.sort((a, b) => (a.seat_no ?? 0) - (b.seat_no ?? 0)).map((attendee) => {
-                    const viewValue = getCurrentViewValue(attendee, selectedView, settings);
-                    const dynamicColor = getDynamicBackgroundColor(viewValue, selectedView, settings);
-                    return (
-                      <div
-                        key={attendee.id}
-                        className={styles.attendeeChip}
-                        style={{ backgroundColor: dynamicColor }}
-                        onMouseEnter={(e) => handleMouseEnter(e, attendee)}
-                        onMouseLeave={handleMouseLeave}
-                      >
-                        {attendee.name} <span className={styles.scoreText}>({(viewValue * 100).toFixed(0)}%)</span>
-                        <span className={styles.seatText}>Seat {attendee.seat_no ?? '-'}</span>
-                      </div>
-                    );
-                  })}
-                  {/* Empty seats */}
-                  {Array((table?.capacity ?? 0) - attendees.length).fill(0).map((_, index) => (
-                    <div key={`empty-${tableId}-${index}`} className={styles.emptySeat}>
-                      (Empty)
-                    </div>
-                  ))}
-                </div>
+        {Object.entries(processedPlan).map(([tableId, attendees]) => {
+          const table = plan.tables.find(t => t.id === Number(tableId));
+          return (
+            <div key={tableId} className={styles.tableContainer}>
+              <div className={styles.table}>
+                Table {tableId} ({attendees.length} / {table?.capacity ?? 0} Seats)
               </div>
-            );
-          });
-        })()}
+              <div className={styles.attendeeGrid}>
+                {/* Sort attendees by seat_no */}
+                {attendees.sort((a, b) => (a.seat_no ?? 0) - (b.seat_no ?? 0)).map((attendee) => {
+                  const viewValue = getCurrentViewValue(attendee, selectedView, settings);
+                  const dynamicColor = getDynamicBackgroundColor(viewValue, selectedView, settings);
+                  return (
+                    <div
+                      key={attendee.id}
+                      className={styles.attendeeChip}
+                      style={{ backgroundColor: dynamicColor }}
+                      onMouseEnter={(e) => handleMouseEnter(e, attendee)}
+                      onMouseLeave={handleMouseLeave}
+                    >
+                      {attendee.name} <span className={styles.scoreText}>({(viewValue * 100).toFixed(0)}%)</span>
+                      <span className={styles.seatText}>Seat {attendee.seat_no ?? '-'}</span>
+                    </div>
+                  );
+                })}
+                {/* Empty seats */}
+                {Array((table?.capacity ?? 0) - attendees.length).fill(0).map((_, index) => (
+                  <div key={`empty-${tableId}-${index}`} className={styles.emptySeat}>
+                    (Empty)
+                  </div>
+                ))}
+              </div>
+            </div>
+          );
+        })}
       </div>
       {/* Tooltip */}
       {tooltip.visible && tooltip.attendee && (
